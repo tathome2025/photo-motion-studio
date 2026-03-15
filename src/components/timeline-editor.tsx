@@ -749,7 +749,7 @@ export function TimelineEditor({
             >
               <RefreshCcw size={15} />
               {selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT
-                ? "已達上限，請刪除相片"
+                ? "已達上限，請刪除相片再重新上傳生成"
                 : "重新生成所有已勾選項目"}
             </button>
           </div>

@@ -68,7 +68,7 @@ export async function POST(
 
     if (asset.regenerationCount >= MAX_REGENERATION_COUNT) {
       return NextResponse.json(
-        { error: "已達重新生成上限。請刪除相片後重新上傳。" },
+        { error: "已達上限，請刪除相片再重新上傳生成。" },
         { status: 400 },
       );
     }

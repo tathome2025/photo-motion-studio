@@ -3,6 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import {
+  findInvalidJpegFiles,
+  JPEG_ACCEPT,
+  prepareJpegFileForUpload,
+} from "@/lib/client-upload";
+
 interface EditUploadPanelProps {
   projectId: string;
   currentAssetCount: number;
@@ -31,7 +37,7 @@ async function parseApiResponse(response: Response) {
     return JSON.parse(rawText) as ApiResponse;
   } catch {
     if (response.status === 413 || rawText.startsWith("Request Entity Too Large")) {
-      throw new Error("單次 request 太大。系統會逐張上傳，請重新選擇相片後再試。");
+      throw new Error("單張 JPG 檔案仍超過部署平台上傳上限，請先縮小相片後再試。");
     }
 
     throw new Error(rawText || `請求失敗 (${response.status})`);
@@ -102,6 +108,14 @@ export function EditUploadPanel({
       return;
     }
 
+    const invalidFiles = findInvalidJpegFiles(files);
+
+    if (invalidFiles.length > 0) {
+      setError(`只接受 JPG / JPEG。請檢查：${invalidFiles.map((file) => file.name).join(", ")}`);
+      event.target.value = "";
+      return;
+    }
+
     if (currentAssetCount + files.length > 100) {
       setError(`此專案最多只可有 100 張相片，現有 ${currentAssetCount} 張。`);
       event.target.value = "";
@@ -123,16 +137,22 @@ export function EditUploadPanel({
     });
 
     try {
-      for (const [index, file] of files.entries()) {
+      for (const [index, originalFile] of files.entries()) {
+        const preparedFile = await prepareJpegFileForUpload(originalFile);
+
         const response = await uploadFileWithProgress(
           `/api/projects/${projectId}/assets`,
-          file,
+          preparedFile,
           (loadedBytes, elapsedMs) => {
             const speed = elapsedMs <= 0 ? 0 : (loadedBytes / elapsedMs) * 1000;
             setUploadProgress({
               currentFile: index + 1,
               totalFiles: files.length,
-              loadedBytes: uploadedBytes + loadedBytes,
+              loadedBytes:
+                uploadedBytes +
+                (preparedFile.size === 0
+                  ? originalFile.size
+                  : (loadedBytes / preparedFile.size) * originalFile.size),
               totalBytes,
               speed: formatSpeed(speed),
             });
@@ -143,11 +163,11 @@ export function EditUploadPanel({
 
         if (!response.ok) {
           throw new Error(
-            data.error ? `${file.name}: ${data.error}` : `${file.name}: 上傳失敗。`,
+            data.error ? `${originalFile.name}: ${data.error}` : `${originalFile.name}: 上傳失敗。`,
           );
         }
 
-        uploadedBytes += file.size;
+        uploadedBytes += originalFile.size;
         setUploadProgress({
           currentFile: index + 1,
           totalFiles: files.length,
@@ -178,7 +198,7 @@ export function EditUploadPanel({
         <h2 className="text-2xl tracking-tight">剪輯途中可再新增相片</h2>
         <p className="max-w-3xl text-sm leading-7 text-[var(--muted)]">
           可一次選取多張相片批量上傳，單一專案最多 100 張。建議上傳面向鏡頭的合照及橫向相片；
-          直向相片會自動左右補黑，統一整理成 16:9。新增完成後會回到設定頁，先為新相片選擇動作再提交。
+          只接受 JPG / JPEG。直向相片會自動左右補黑，統一整理成 16:9。新增完成後會回到設定頁，先為新相片選擇動作再提交。
         </p>
       </div>
 
@@ -187,7 +207,7 @@ export function EditUploadPanel({
           {isUploading ? "上傳中..." : "新增上傳相片"}
           <input
             type="file"
-            accept="image/*"
+            accept={JPEG_ACCEPT}
             multiple
             className="hidden"
             onChange={handleUpload}

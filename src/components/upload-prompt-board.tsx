@@ -6,6 +6,11 @@ import { useMemo, useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
 
 import { MAX_REGENERATION_COUNT, PROMPT_OPTIONS } from "@/lib/constants";
+import {
+  findInvalidJpegFiles,
+  JPEG_ACCEPT,
+  prepareJpegFileForUpload,
+} from "@/lib/client-upload";
 import type { ProjectAsset, PromptKey } from "@/lib/types";
 
 interface UploadPromptBoardProps {
@@ -40,7 +45,7 @@ async function parseApiResponse(response: Response) {
     return JSON.parse(rawText) as ApiResponse;
   } catch {
     if (response.status === 413 || rawText.startsWith("Request Entity Too Large")) {
-      throw new Error("單次 request 太大。系統會逐張上傳，請重新選擇相片後再試。");
+      throw new Error("單張 JPG 檔案仍超過部署平台上傳上限，請先縮小相片後再試。");
     }
 
     throw new Error(rawText || `請求失敗 (${response.status})`);
@@ -153,6 +158,14 @@ export function UploadPromptBoard({
       return;
     }
 
+    const invalidFiles = findInvalidJpegFiles(files);
+
+    if (invalidFiles.length > 0) {
+      setUploadError(`只接受 JPG / JPEG。請檢查：${invalidFiles.map((file) => file.name).join(", ")}`);
+      event.target.value = "";
+      return;
+    }
+
     if (assets.length + files.length > 100) {
       setUploadError(`此專案最多只可有 100 張相片，現有 ${assets.length} 張。`);
       event.target.value = "";
@@ -175,16 +188,22 @@ export function UploadPromptBoard({
     try {
       let latestAssets = assets;
 
-      for (const [index, file] of files.entries()) {
+      for (const [index, originalFile] of files.entries()) {
+        const preparedFile = await prepareJpegFileForUpload(originalFile);
+
         const response = await uploadFileWithProgress(
           `/api/projects/${projectId}/assets`,
-          file,
+          preparedFile,
           (loadedBytes, elapsedMs) => {
             const speed = elapsedMs <= 0 ? 0 : (loadedBytes / elapsedMs) * 1000;
             setUploadProgress({
               currentFile: index + 1,
               totalFiles: files.length,
-              loadedBytes: uploadedBytes + loadedBytes,
+              loadedBytes:
+                uploadedBytes +
+                (preparedFile.size === 0
+                  ? originalFile.size
+                  : (loadedBytes / preparedFile.size) * originalFile.size),
               totalBytes,
               speed: formatSpeed(speed),
             });
@@ -195,11 +214,11 @@ export function UploadPromptBoard({
 
         if (!response.ok) {
           throw new Error(
-            data.error ? `${file.name}: ${data.error}` : `${file.name}: 上傳失敗。`,
+            data.error ? `${originalFile.name}: ${data.error}` : `${originalFile.name}: 上傳失敗。`,
           );
         }
 
-        uploadedBytes += file.size;
+        uploadedBytes += originalFile.size;
         latestAssets = data.assets ?? latestAssets;
         setAssets(latestAssets);
         setGenerationSelection((current) => {
@@ -339,7 +358,7 @@ export function UploadPromptBoard({
           <label className="inline-flex h-12 cursor-pointer items-center justify-center border border-[var(--text)] px-5 text-sm uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)]">
             <input
               type="file"
-              accept="image/*"
+              accept={JPEG_ACCEPT}
               multiple
               className="hidden"
               onChange={handleUpload}
@@ -353,6 +372,7 @@ export function UploadPromptBoard({
 
         <div className="grid gap-3 border border-[var(--line)] bg-[var(--surface-soft)] p-4 text-sm leading-7 text-[var(--muted)]">
           <p>可一次選取多張相片批量上傳，單一專案最多 100 張。</p>
+          <p>上傳前只接受 JPG / JPEG 格式。</p>
           <p>建議上傳面向鏡頭的合照以及橫向相片，生成效果最佳。</p>
           <p>直向相片會自動在左右兩邊填充黑色，統一成橫向 16:9 方便後續生成與剪輯。</p>
         </div>
@@ -422,11 +442,11 @@ export function UploadPromptBoard({
                     <Trash2 size={15} />
                   </button>
                 </div>
-                <div className="grid min-h-[220px] place-items-center border border-[var(--line)] bg-black p-0">
+                <div className="grid aspect-video w-full place-items-center overflow-hidden border border-[var(--line)] bg-black p-0">
                   <img
                     src={asset.originalUrl}
                     alt={asset.fileName}
-                    className="aspect-video max-h-[200px] max-w-[200px] object-contain"
+                    className="h-full w-full object-contain"
                   />
                 </div>
                 <div className="flex items-center justify-between text-xs text-[var(--muted)]">

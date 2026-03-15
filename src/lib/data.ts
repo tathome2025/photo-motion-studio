@@ -436,7 +436,7 @@ export async function markAssetQueued(input: {
     const regenerationCount = Number(existingAsset?.regeneration_count ?? 0);
 
     if (regenerationCount >= MAX_REGENERATION_COUNT) {
-      throw new Error("已達重新生成上限。請刪除相片後重新上傳。");
+      throw new Error("已達上限，請刪除相片再重新上傳生成。");
     }
 
     updates.regeneration_count = regenerationCount + 1;
@@ -490,7 +490,7 @@ export async function markAssetStaticCompleted(input: {
     const regenerationCount = Number(existingAsset?.regeneration_count ?? 0);
 
     if (regenerationCount >= MAX_REGENERATION_COUNT) {
-      throw new Error("已達重新生成上限。請刪除相片後重新上傳。");
+      throw new Error("已達上限，請刪除相片再重新上傳生成。");
     }
 
     updates.regeneration_count = regenerationCount + 1;
