@@ -142,7 +142,7 @@ function SortableTimelineClip({
     <article
       ref={setNodeRef}
       style={style}
-      className={`grid min-w-[190px] gap-3 border p-3 transition ${
+      className={`grid min-w-[170px] gap-3 border p-3 transition ${
         isSelected ? "border-[var(--text)] bg-[var(--surface)]" : "border-[var(--line)]"
       }`}
     >
@@ -155,17 +155,17 @@ function SortableTimelineClip({
           <span>{asset.isStaticClip ? "static" : "video"}</span>
           <span>{asset.fileName}</span>
         </div>
-        <div className="grid h-[110px] place-items-center overflow-hidden border border-[var(--line)] bg-black">
+        <div className="grid aspect-square w-[140px] place-items-center overflow-hidden border border-[var(--line)] bg-black">
           {asset.isStaticClip ? (
             <img
               src={asset.originalUrl}
               alt={asset.fileName}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
             />
           ) : (
             <video
               src={asset.generatedUrl ?? undefined}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
               muted
             />
           )}
