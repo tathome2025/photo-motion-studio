@@ -149,6 +149,7 @@ export async function createKlingImageToVideoTask({
       duration: String(duration),
       aspect_ratio: "16:9",
       mode: process.env.KIE_KLING_MODE?.trim() || "std",
+      multi_shots: false,
     },
   };
 
