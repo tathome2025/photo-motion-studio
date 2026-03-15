@@ -124,7 +124,7 @@ export function WaitingRoom({
           </p>
           <h2 className="text-3xl tracking-tight">正在等待所有動態相片完成</h2>
           <p className="max-w-2xl text-sm leading-6 text-[var(--muted)]">
-            Kling 任務已成功建立，系統會定時輪詢狀態。你可以離開此頁建立其他專案，之後再回來繼續剪輯。
+            動態影像已進入處理佇列，系統會自動檢查最新進度。你可以離開此頁建立其他專案，之後再回來繼續剪輯。
           </p>
           <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
             <span className="inline-flex items-center gap-2 border border-[var(--line)] px-3 py-2">
@@ -133,7 +133,7 @@ export function WaitingRoom({
                   isSyncing ? "animate-status-pulse bg-[var(--text)]" : "bg-transparent"
                 }`}
               />
-              {isSyncing ? "syncing" : "standby"}
+              {isSyncing ? "checking" : "standby"}
             </span>
             {lastCheckedAt ? <span>last check {lastCheckedAt}</span> : null}
           </div>
@@ -177,9 +177,7 @@ export function WaitingRoom({
             </p>
             <h3 className="text-xl tracking-tight">片段處理中</h3>
           </div>
-          <div className="text-sm text-[var(--muted)]">
-            Kling processing...
-          </div>
+          <div className="text-sm text-[var(--muted)]">自動更新中...</div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">

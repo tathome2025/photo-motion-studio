@@ -19,7 +19,7 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: `${APP_NAME} | Photo To Motion`,
   description:
-    "Batch convert photos into Kling-generated motion clips, arrange them on a timeline, and export a clean final video.",
+    "Batch convert photos into motion clips, arrange them on a timeline, and export a clean final video.",
 };
 
 export default function RootLayout({

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { CreateProjectForm } from "@/components/create-project-form";
 import { DeleteProjectButton } from "@/components/delete-project-button";
+import { ProjectStatusPoller } from "@/components/project-status-poller";
 import { APP_NAME } from "@/lib/constants";
 import { isSupabaseConfigured, listProjects } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
@@ -23,9 +24,13 @@ function getProjectLink(projectId: string, status: string) {
 export default async function HomePage() {
   const configured = isSupabaseConfigured();
   const projects = configured ? await listProjects() : [];
+  const generatingProjectIds = projects
+    .filter((project) => project.status === "generating")
+    .map((project) => project.id);
 
   return (
     <main className="mx-auto grid min-h-screen w-full max-w-7xl gap-10 px-6 py-8 md:px-10">
+      <ProjectStatusPoller projectIds={generatingProjectIds} />
       <section className="grid gap-6 border border-[var(--line-strong)] p-6 md:grid-cols-[1.1fr_0.9fr] md:items-end">
         <div className="space-y-5">
           <p className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]">
@@ -36,7 +41,7 @@ export default async function HomePage() {
               把相片批量轉成動態影像，再直接排進影片時間線。
             </h1>
             <p className="max-w-2xl text-sm leading-7 text-[var(--muted)] md:text-base">
-              這個版本為 GitHub + Vercel 部署而設計，使用 Supabase 管理專案資料與媒體檔案，並預留 KlingAI API 生成與輪詢流程。
+              這個版本為 GitHub + Vercel 部署而設計，使用專案資料與媒體檔案管理，並會自動更新生成進度。
             </p>
           </div>
         </div>
