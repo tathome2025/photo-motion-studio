@@ -198,7 +198,7 @@ export function EditUploadPanel({
         <h2 className="text-2xl tracking-tight">剪輯途中可再新增相片</h2>
         <p className="max-w-3xl text-sm leading-7 text-[var(--muted)]">
           可一次選取多張相片批量上傳，單一專案最多 100 張。建議上傳面向鏡頭的合照及橫向相片；
-          只接受 JPG / JPEG。直向相片會自動左右補黑，統一整理成 16:9。新增完成後會回到設定頁，先為新相片選擇動作再提交。
+          只接受 JPG / JPEG。直向相片會自動延展成模糊背景，統一整理成 16:9。新增完成後會回到設定頁，先為新相片選擇動作再提交。
         </p>
       </div>
 
