@@ -26,6 +26,27 @@ function getBaseUrl() {
   return process.env.KIE_API_BASE_URL ?? "https://api.kie.ai/api/v1";
 }
 
+function getModelName() {
+  const configured = process.env.KIE_MODEL_NAME?.trim();
+
+  if (!configured) {
+    return "kling-3.0/video";
+  }
+
+  const normalized = configured.toLowerCase();
+
+  if (
+    normalized === "kling-video-v3" ||
+    normalized === "kling-video-3" ||
+    normalized === "kling3" ||
+    normalized === "kling-3"
+  ) {
+    return "kling-3.0/video";
+  }
+
+  return configured;
+}
+
 function getCreatePath() {
   return process.env.KIE_CREATE_TASK_PATH ?? "/jobs/createTask";
 }
@@ -119,7 +140,7 @@ export async function createKlingImageToVideoTask({
 }: CreateKlingTaskInput) {
   const duration = Number(process.env.KLING_DURATION_SECONDS ?? DEFAULT_CLIP_DURATION);
   const payload: Record<string, unknown> = {
-    model: process.env.KIE_MODEL_NAME?.trim() || "kling-video-v3",
+    model: getModelName(),
     callBackUrl:
       callbackUrl && !callbackUrl.includes("localhost") ? callbackUrl : undefined,
     input: {

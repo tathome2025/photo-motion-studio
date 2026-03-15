@@ -73,7 +73,7 @@ KIE_API_KEY=
 KIE_API_BASE_URL=https://api.kie.ai/api/v1
 KIE_CREATE_TASK_PATH=/jobs/createTask
 KIE_QUERY_TASK_TEMPLATE=/jobs/recordInfo?taskId={taskId}
-KIE_MODEL_NAME=kling-video-v3
+KIE_MODEL_NAME=kling-3.0/video
 KIE_KLING_MODE=std
 KLING_DURATION_SECONDS=5
 ```
@@ -81,7 +81,7 @@ KLING_DURATION_SECONDS=5
 說明：
 
 - `KIE_API_KEY` 是唯一必填的 provider key。
-- 預設 model 已改為 `kling-video-v3`。
+- 預設 model 已改為 `kling-3.0/video`。
 - `src/lib/kling.ts` 現在是走 KIE AI 的 Bearer Token、`createTask` 與 `recordInfo` 流程。
 
 ## 升級 schema
