@@ -425,79 +425,92 @@ export function UploadPromptBoard({
             先上傳相片，之後才可以指派 prompt。
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {assets.map((asset, index) => (
-              <article
-                key={asset.id}
-                className="grid gap-3 border border-[var(--line)] p-4"
-              >
-                <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-                  <span>#{String(index + 1).padStart(2, "0")}</span>
-                  <button
-                    type="button"
-                    className="inline-flex h-9 w-9 items-center justify-center border border-[var(--line)] transition hover:border-[#8d2f24] hover:text-[#8d2f24]"
-                    onClick={() => handleDeleteAsset(asset.id)}
-                    aria-label={`刪除 ${asset.fileName}`}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-                <div className="grid aspect-video w-full place-items-center overflow-hidden border border-[var(--line)] bg-black p-0">
-                  <img
-                    src={asset.originalUrl}
-                    alt={asset.fileName}
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-                <div className="flex items-center justify-between text-xs text-[var(--muted)]">
-                  <span className="truncate">{asset.fileName}</span>
-                  <span>{asset.regenerationCount}/{MAX_REGENERATION_COUNT} re-gen</span>
-                </div>
-                {asset.generationStatus === "completed" ? (
-                  <label className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-                    <input
-                      type="checkbox"
-                      className="h-3.5 w-3.5"
-                      checked={isSelectedForGeneration(asset)}
-                      onChange={(event) =>
-                        handleGenerationSelectionChange(asset.id, event.target.checked)
-                      }
-                    />
-                    勾選後重新生成
-                  </label>
-                ) : (
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-                    新加入相片將於本次生成
-                  </div>
-                )}
-                <select
-                  className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm outline-none focus:border-[var(--text)]"
-                  value={asset.promptKey ?? ""}
-                  onChange={(event) =>
-                    handlePromptChange(asset.id, event.target.value as PromptKey)
-                  }
-                  disabled={asset.generationStatus === "completed" && !isSelectedForGeneration(asset)}
+          <div className="grid gap-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {assets.map((asset, index) => (
+                <article
+                  key={asset.id}
+                  className="grid gap-3 border border-[var(--line)] p-4"
                 >
-                  <option value="">選擇動作 prompt</option>
-                  {PROMPT_OPTIONS.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                {asset.promptKey === "custom" ? (
-                  <textarea
-                    className="min-h-24 border border-[var(--line)] bg-transparent px-3 py-3 text-sm outline-none focus:border-[var(--text)]"
-                    placeholder="輸入你想要的自訂動作 prompt"
-                    value={asset.customPrompt ?? ""}
+                  <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+                    <span>#{String(index + 1).padStart(2, "0")}</span>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 w-9 items-center justify-center border border-[var(--line)] transition hover:border-[#8d2f24] hover:text-[#8d2f24]"
+                      onClick={() => handleDeleteAsset(asset.id)}
+                      aria-label={`刪除 ${asset.fileName}`}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                  <div className="grid aspect-video w-full place-items-center overflow-hidden border border-[var(--line)] bg-black p-0">
+                    <img
+                      src={asset.originalUrl}
+                      alt={asset.fileName}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-[var(--muted)]">
+                    <span className="truncate">{asset.fileName}</span>
+                    <span>{asset.regenerationCount}/{MAX_REGENERATION_COUNT} re-gen</span>
+                  </div>
+                  {asset.generationStatus === "completed" ? (
+                    <label className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5"
+                        checked={isSelectedForGeneration(asset)}
+                        onChange={(event) =>
+                          handleGenerationSelectionChange(asset.id, event.target.checked)
+                        }
+                      />
+                      勾選後重新生成
+                    </label>
+                  ) : (
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+                      新加入相片將於本次生成
+                    </div>
+                  )}
+                  <select
+                    className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm outline-none focus:border-[var(--text)]"
+                    value={asset.promptKey ?? ""}
                     onChange={(event) =>
-                      handleCustomPromptChange(asset.id, event.target.value)
+                      handlePromptChange(asset.id, event.target.value as PromptKey)
                     }
                     disabled={asset.generationStatus === "completed" && !isSelectedForGeneration(asset)}
-                  />
-                ) : null}
-              </article>
-            ))}
+                  >
+                    <option value="">選擇動作 prompt</option>
+                    {PROMPT_OPTIONS.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {asset.promptKey === "custom" ? (
+                    <textarea
+                      className="min-h-24 border border-[var(--line)] bg-transparent px-3 py-3 text-sm outline-none focus:border-[var(--text)]"
+                      placeholder="輸入你想要的自訂動作 prompt"
+                      value={asset.customPrompt ?? ""}
+                      onChange={(event) =>
+                        handleCustomPromptChange(asset.id, event.target.value)
+                      }
+                      disabled={asset.generationStatus === "completed" && !isSelectedForGeneration(asset)}
+                    />
+                  ) : null}
+                </article>
+              ))}
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="h-12 border border-[var(--text)] px-5 text-sm uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)] disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:text-[var(--muted)]"
+                disabled={!allPromptSelected || isPending}
+                onClick={handleGenerate}
+              >
+                {isPending ? "提交中..." : "開始生成動態影像"}
+              </button>
+            </div>
           </div>
         )}
 
