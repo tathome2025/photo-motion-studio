@@ -117,7 +117,7 @@ export default async function HomePage() {
               目前還沒有專案，先在左側建立第一個。
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {projects.map((project) => {
                 const borderColor = getProjectCardBorderColor(project.status);
 
