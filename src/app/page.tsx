@@ -21,6 +21,22 @@ function getProjectLink(projectId: string, status: string) {
   return `/projects/${projectId}`;
 }
 
+function getProjectCardBackground(status: string) {
+  if (status === "draft") {
+    return "#FFFFC5";
+  }
+
+  if (status === "ready") {
+    return "#cff0af";
+  }
+
+  if (status === "generating") {
+    return "#f0b5af";
+  }
+
+  return "transparent";
+}
+
 export default async function HomePage() {
   const configured = isSupabaseConfigured();
   const projects = configured ? await listProjects() : [];
@@ -98,6 +114,7 @@ export default async function HomePage() {
                 <article
                   key={project.id}
                   className="grid gap-6 border border-[var(--line)] p-5 transition hover:border-[var(--text)]"
+                  style={{ backgroundColor: getProjectCardBackground(project.status) }}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <Link
