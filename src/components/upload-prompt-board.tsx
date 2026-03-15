@@ -19,6 +19,10 @@ export function UploadPromptBoard({
   const router = useRouter();
   const [assets, setAssets] = useState(initialAssets);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -29,6 +33,23 @@ export function UploadPromptBoard({
     [assets],
   );
 
+  async function parseApiResponse(response: Response) {
+    const rawText = await response.text();
+
+    try {
+      return JSON.parse(rawText) as {
+        error?: string;
+        assets?: ProjectAsset[];
+      };
+    } catch {
+      if (response.status === 413 || rawText.startsWith("Request Entity Too Large")) {
+        throw new Error("單次 request 太大。系統已改為逐張上傳，但你這次請重新選擇相片再試。");
+      }
+
+      throw new Error(rawText || `請求失敗 (${response.status})`);
+    }
+  }
+
   async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
 
@@ -38,26 +59,40 @@ export function UploadPromptBoard({
 
     setUploadError(null);
     setIsUploading(true);
+    setUploadProgress({
+      current: 0,
+      total: files.length,
+    });
 
     try {
-      const formData = new FormData();
+      let latestAssets = assets;
 
-      for (const file of files) {
+      for (const [index, file] of files.entries()) {
+        setUploadProgress({
+          current: index + 1,
+          total: files.length,
+        });
+
+        const formData = new FormData();
         formData.append("files", file);
+
+        const response = await fetch(`/api/projects/${projectId}/assets`, {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await parseApiResponse(response);
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ? `${file.name}: ${data.error}` : `${file.name}: 上傳失敗。`,
+          );
+        }
+
+        latestAssets = data.assets ?? latestAssets;
+        setAssets(latestAssets);
       }
 
-      const response = await fetch(`/api/projects/${projectId}/assets`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error ?? "上傳失敗。");
-      }
-
-      setAssets(data.assets);
       router.refresh();
     } catch (error) {
       setUploadError(
@@ -65,6 +100,7 @@ export function UploadPromptBoard({
       );
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
       event.target.value = "";
     }
   }
@@ -132,7 +168,9 @@ export function UploadPromptBoard({
               onChange={handleUpload}
               disabled={isUploading}
             />
-            {isUploading ? "上傳中..." : "選擇相片"}
+            {isUploading
+              ? `上傳中 ${uploadProgress?.current ?? 0}/${uploadProgress?.total ?? 0}`
+              : "選擇相片"}
           </label>
         </div>
         <p className="max-w-2xl text-sm leading-6 text-[var(--muted)]">
