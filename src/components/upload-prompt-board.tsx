@@ -125,6 +125,18 @@ export function UploadPromptBoard({
       return;
     }
 
+    if (files.length > 100) {
+      setUploadError("單次最多選擇 100 張相片。");
+      event.target.value = "";
+      return;
+    }
+
+    if (assets.length + files.length > 100) {
+      setUploadError(`此專案最多只可有 100 張相片，現有 ${assets.length} 張。`);
+      event.target.value = "";
+      return;
+    }
+
     const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
     let uploadedBytes = 0;
 
@@ -296,6 +308,7 @@ export function UploadPromptBoard({
         </div>
 
         <div className="grid gap-3 border border-[var(--line)] bg-[var(--surface-soft)] p-4 text-sm leading-7 text-[var(--muted)]">
+          <p>可一次選取多張相片批量上傳，單一專案最多 100 張。</p>
           <p>建議上傳面向鏡頭的合照以及橫向相片，生成效果最佳。</p>
           <p>直向相片會自動在左右兩邊填充黑色，統一成橫向 16:9 方便後續生成與剪輯。</p>
         </div>

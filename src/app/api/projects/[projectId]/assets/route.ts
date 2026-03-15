@@ -18,6 +18,7 @@ export async function POST(
 ) {
   try {
     const { projectId } = await context.params;
+    const currentProject = await getProjectDetails(projectId);
     const formData = await request.formData();
     const files = formData.getAll("files").filter((value) => value instanceof File) as File[];
 
@@ -26,7 +27,16 @@ export async function POST(
     }
 
     if (files.length > 100) {
-      return NextResponse.json({ error: "單次最多上傳 100 張相片。" }, { status: 400 });
+      return NextResponse.json({ error: "單次最多選擇 100 張相片。" }, { status: 400 });
+    }
+
+    const existingCount = currentProject?.assetCount ?? 0;
+
+    if (existingCount + files.length > 100) {
+      return NextResponse.json(
+        { error: `此專案最多只可有 100 張相片，現有 ${existingCount} 張。` },
+        { status: 400 },
+      );
     }
 
     const supabase = assertSupabaseAdmin();

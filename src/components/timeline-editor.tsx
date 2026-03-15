@@ -20,7 +20,7 @@ import { fetchFile } from "@ffmpeg/util";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { GripVertical, RefreshCcw, Trash2, VideoOff } from "lucide-react";
+import { GripVertical, RefreshCcw, Trash2 } from "lucide-react";
 
 import {
   FRAME_STYLE_OPTIONS,
@@ -328,34 +328,6 @@ export function TimelineEditor({
 
     setAssets((current) => current.filter((asset) => asset.id !== selectedAsset.id));
     setStatusMessage("片段已刪除。");
-  }
-
-  async function deleteGenerated() {
-    if (!selectedAsset) {
-      return;
-    }
-
-    const confirmed = window.confirm("刪除生成結果後，該相片會回到待生成狀態，是否繼續？");
-
-    if (!confirmed) {
-      return;
-    }
-
-    setError(null);
-    const response = await fetch(
-      `/api/projects/${projectId}/assets/${selectedAsset.id}/generated`,
-      {
-        method: "DELETE",
-      },
-    );
-    const data = await parseApiResponse(response);
-
-    if (!response.ok) {
-      setError(data.error ?? "刪除影片失敗。");
-      return;
-    }
-
-    window.location.href = `/projects/${projectId}`;
   }
 
   async function regenerateSelected() {
@@ -677,7 +649,7 @@ export function TimelineEditor({
             </button>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3">
             <button
               type="button"
               className="inline-flex h-11 items-center justify-center gap-2 border border-[var(--line)] px-4 text-sm uppercase tracking-[0.2em] transition hover:border-[#8d2f24] hover:text-[#8d2f24]"
@@ -685,15 +657,6 @@ export function TimelineEditor({
             >
               <Trash2 size={15} />
               刪除相片
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-11 items-center justify-center gap-2 border border-[var(--line)] px-4 text-sm uppercase tracking-[0.2em] transition hover:border-[#8d2f24] hover:text-[#8d2f24]"
-              onClick={deleteGenerated}
-              disabled={selectedAsset.isStaticClip}
-            >
-              <VideoOff size={15} />
-              刪除已生成影片
             </button>
           </div>
         </div>
