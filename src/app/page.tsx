@@ -21,7 +21,7 @@ function getProjectLink(projectId: string, status: string) {
   return `/projects/${projectId}`;
 }
 
-function getProjectCardBackground(status: string) {
+function getProjectCardBorderColor(status: string) {
   if (status === "draft") {
     return "#FFFFC5";
   }
@@ -34,7 +34,7 @@ function getProjectCardBackground(status: string) {
     return "#f0b5af";
   }
 
-  return "transparent";
+  return null;
 }
 
 export default async function HomePage() {
@@ -110,48 +110,59 @@ export default async function HomePage() {
             </div>
           ) : (
             <div className="grid gap-4 xl:grid-cols-2">
-              {projects.map((project) => (
-                <article
-                  key={project.id}
-                  className="grid gap-6 border border-[var(--line)] p-5 transition hover:border-[var(--text)]"
-                  style={{ backgroundColor: getProjectCardBackground(project.status) }}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <Link
-                      href={getProjectLink(project.id, project.status)}
-                      className="space-y-2"
-                    >
-                      <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-                        {project.status}
-                      </p>
-                      <h3 className="text-2xl tracking-tight">{project.name}</h3>
-                    </Link>
-                    <div className="text-right text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-                      {project.completedCount}/{project.assetCount}
-                    </div>
-                  </div>
+              {projects.map((project) => {
+                const borderColor = getProjectCardBorderColor(project.status);
 
-                  <div className="grid grid-cols-2 gap-3 border-t border-[var(--line)] pt-4 text-sm text-[var(--muted)]">
-                    <div>建立時間</div>
-                    <div className="text-right text-[var(--text)]">
-                      {formatDate(project.createdAt)}
+                return (
+                  <article
+                    key={project.id}
+                    className="grid gap-6 border border-[var(--line)] p-5 transition hover:border-[var(--text)]"
+                    style={
+                      borderColor
+                        ? {
+                            borderColor,
+                            borderWidth: 3,
+                          }
+                        : undefined
+                    }
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <Link
+                        href={getProjectLink(project.id, project.status)}
+                        className="space-y-2"
+                      >
+                        <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
+                          {project.status}
+                        </p>
+                        <h3 className="text-2xl tracking-tight">{project.name}</h3>
+                      </Link>
+                      <div className="text-right text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+                        {project.completedCount}/{project.assetCount}
+                      </div>
                     </div>
-                    <div>更新時間</div>
-                    <div className="text-right text-[var(--text)]">
-                      {formatDate(project.updatedAt)}
+
+                    <div className="grid grid-cols-2 gap-3 border-t border-[var(--line)] pt-4 text-sm text-[var(--muted)]">
+                      <div>建立時間</div>
+                      <div className="text-right text-[var(--text)]">
+                        {formatDate(project.createdAt)}
+                      </div>
+                      <div>更新時間</div>
+                      <div className="text-right text-[var(--text)]">
+                        {formatDate(project.updatedAt)}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <Link
-                      href={getProjectLink(project.id, project.status)}
-                      className="inline-flex h-10 items-center justify-center border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
-                    >
-                      開啟專案
-                    </Link>
-                    <DeleteProjectButton projectId={project.id} compact />
-                  </div>
-                </article>
-              ))}
+                    <div className="flex justify-between gap-3">
+                      <Link
+                        href={getProjectLink(project.id, project.status)}
+                        className="inline-flex h-10 items-center justify-center border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
+                      >
+                        開啟專案
+                      </Link>
+                      <DeleteProjectButton projectId={project.id} compact />
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </div>
