@@ -75,6 +75,7 @@ KIE_CREATE_TASK_PATH=/jobs/createTask
 KIE_QUERY_TASK_TEMPLATE=/jobs/recordInfo?taskId={taskId}
 KIE_MODEL_NAME=kling-3.0/video
 KIE_KLING_MODE=std
+KIE_ENABLE_SOUND=false
 KLING_DURATION_SECONDS=5
 ```
 
@@ -82,6 +83,7 @@ KLING_DURATION_SECONDS=5
 
 - `KIE_API_KEY` 是唯一必填的 provider key。
 - 預設 model 已改為 `kling-3.0/video`。
+- `KIE_ENABLE_SOUND` 預設為 `false`，因為 KIE AI 這個模型要求 `sound` 欄位必須顯式傳入。
 - `src/lib/kling.ts` 現在是走 KIE AI 的 Bearer Token、`createTask` 與 `recordInfo` 流程。
 
 ## 升級 schema

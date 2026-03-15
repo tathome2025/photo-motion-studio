@@ -47,6 +47,16 @@ function getModelName() {
   return configured;
 }
 
+function getSoundEnabled() {
+  const configured = process.env.KIE_ENABLE_SOUND?.trim().toLowerCase();
+
+  if (!configured) {
+    return false;
+  }
+
+  return configured === "1" || configured === "true" || configured === "yes";
+}
+
 function getCreatePath() {
   return process.env.KIE_CREATE_TASK_PATH ?? "/jobs/createTask";
 }
@@ -149,6 +159,7 @@ export async function createKlingImageToVideoTask({
       duration: String(duration),
       aspect_ratio: "16:9",
       mode: process.env.KIE_KLING_MODE?.trim() || "std",
+      sound: getSoundEnabled(),
       multi_shots: false,
     },
   };
