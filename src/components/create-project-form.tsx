@@ -1,0 +1,63 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+
+export function CreateProjectForm() {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+
+    startTransition(async () => {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error ?? "建立專案失敗。");
+        return;
+      }
+
+      router.push(`/projects/${data.project.id}`);
+      router.refresh();
+    });
+  }
+
+  return (
+    <form className="grid gap-4 border border-[var(--line)] p-5" onSubmit={handleSubmit}>
+      <div className="space-y-2">
+        <label className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
+          New project
+        </label>
+        <input
+          required
+          className="h-12 border border-[var(--line)] bg-transparent px-4 text-sm outline-none transition focus:border-[var(--text)]"
+          placeholder="例如：Family Portrait Cut"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </div>
+
+      <button
+        type="submit"
+        className="h-12 border border-[var(--text)] px-4 text-sm uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={isPending}
+      >
+        {isPending ? "建立中..." : "新增專案"}
+      </button>
+
+      {error ? <p className="text-sm text-[#8d2f24]">{error}</p> : null}
+    </form>
+  );
+}
