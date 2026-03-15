@@ -11,6 +11,7 @@ import {
   markProjectStatus,
 } from "@/lib/data";
 import { createKlingImageToVideoTask } from "@/lib/kling";
+import { buildGenerationPrompt } from "@/lib/prompt";
 
 const payloadSchema = z.object({
   promptKey: z.enum([
@@ -87,7 +88,9 @@ export async function POST(
         const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
         const task = await createKlingImageToVideoTask({
           imageUrl: asset.originalUrl,
-          prompt: getPromptText(payload.promptKey, payload.customPrompt),
+          prompt: buildGenerationPrompt(
+            getPromptText(payload.promptKey, payload.customPrompt),
+          ),
           callbackUrl: `${appUrl}/api/kling/callback?projectId=${projectId}&assetId=${assetId}`,
         });
 

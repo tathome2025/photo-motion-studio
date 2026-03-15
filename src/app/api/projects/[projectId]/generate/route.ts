@@ -12,6 +12,7 @@ import {
   savePromptSelections,
 } from "@/lib/data";
 import { createKlingImageToVideoTask } from "@/lib/kling";
+import { buildGenerationPrompt } from "@/lib/prompt";
 
 const selectionSchema = z.object({
   id: z.string().uuid(),
@@ -132,7 +133,7 @@ export async function POST(
 
         const task = await createKlingImageToVideoTask({
           imageUrl: asset.originalUrl,
-          prompt: getPromptText(selection),
+          prompt: buildGenerationPrompt(getPromptText(selection)),
           callbackUrl: `${appUrl}/api/kling/callback?projectId=${projectId}&assetId=${asset.id}`,
         });
 
