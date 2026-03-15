@@ -64,3 +64,91 @@ button {
   color: var(--surface);
   background: var(--text);
 }
+
+@keyframes rig-spin {
+  from {
+    transform: rotate(0deg) scale(0.96);
+  }
+  50% {
+    transform: rotate(180deg) scale(1);
+  }
+  to {
+    transform: rotate(360deg) scale(0.96);
+  }
+}
+
+@keyframes rig-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes scan-line {
+  0% {
+    transform: translateX(-35%);
+  }
+  100% {
+    transform: translateX(135%);
+  }
+}
+
+.animate-status-pulse {
+  animation: status-pulse 1.4s linear infinite;
+}
+
+.processing-rig {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(22, 22, 22, 0.05) 0,
+      rgba(22, 22, 22, 0.05) 1px,
+      transparent 1px,
+      transparent 28px
+    );
+}
+
+.processing-rig__stage {
+  animation: rig-spin 7s linear infinite;
+}
+
+.processing-rig__ring {
+  animation: rig-pulse 1.8s ease-in-out infinite;
+}
+
+.processing-rig__ring--delay {
+  animation-delay: 0.35s;
+}
+
+.processing-rig__core {
+  animation: rig-pulse 1.2s ease-in-out infinite;
+}
+
+.progress-scan,
+.queue-card-scan {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(22, 22, 22, 0.12) 45%,
+    rgba(22, 22, 22, 0.24) 50%,
+    rgba(22, 22, 22, 0.12) 55%,
+    transparent 100%
+  );
+  animation: scan-line 1.6s linear infinite;
+}
