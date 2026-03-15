@@ -19,7 +19,11 @@ type KlingPayload = Record<string, unknown> & {
 function shouldSendMode(modelName: string) {
   const normalized = modelName.toLowerCase();
 
-  if (normalized.startsWith("kling-v2") && !normalized.startsWith("kling-v2-1")) {
+  if (
+    normalized.startsWith("kling-v2") ||
+    normalized.startsWith("video-2.6") ||
+    normalized.startsWith("video2.6")
+  ) {
     return false;
   }
 
@@ -116,7 +120,7 @@ export async function createKlingImageToVideoTask({
   callbackUrl,
 }: CreateKlingTaskInput) {
   const duration = Number(process.env.KLING_DURATION_SECONDS ?? DEFAULT_CLIP_DURATION);
-  const modelName = process.env.KLING_MODEL_NAME ?? "kling-v1-6";
+  const modelName = process.env.KLING_MODEL_NAME ?? "video-2.6";
   const configuredMode = process.env.KLING_MODE;
 
   const payload: Record<string, unknown> = {

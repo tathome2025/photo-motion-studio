@@ -14,10 +14,13 @@ create table if not exists public.project_assets (
   file_name text not null,
   original_url text not null,
   generated_url text,
-  prompt_key text check (prompt_key in ('smile', 'greeting', 'laughing', 'handshake', 'hugging', 'brotherhood', 'blow-a-kiss')),
+  prompt_key text check (prompt_key in ('smile', 'greeting', 'laughing', 'handshake', 'hugging', 'brotherhood', 'blow-a-kiss', 'custom', 'static')),
   prompt_label text,
+  custom_prompt text,
   generation_status text not null default 'uploaded' check (generation_status in ('uploaded', 'queued', 'processing', 'completed', 'failed')),
   kling_task_id text,
+  regeneration_count integer not null default 0,
+  is_static_clip boolean not null default false,
   timeline_order integer not null default 0,
   transition_key text not null default 'fade' check (transition_key in ('cut', 'fade', 'wipeleft', 'slideup')),
   theme_key text not null default 'editorial' check (theme_key in ('editorial', 'mono', 'warm', 'blueprint')),
@@ -39,6 +42,16 @@ create table if not exists public.render_jobs (
 
 create index if not exists idx_project_assets_project_id on public.project_assets(project_id);
 create index if not exists idx_project_assets_status on public.project_assets(project_id, generation_status);
+
+alter table public.project_assets
+  add column if not exists custom_prompt text,
+  add column if not exists regeneration_count integer not null default 0,
+  add column if not exists is_static_clip boolean not null default false;
+
+alter table public.project_assets drop constraint if exists project_assets_prompt_key_check;
+alter table public.project_assets
+  add constraint project_assets_prompt_key_check
+  check (prompt_key in ('smile', 'greeting', 'laughing', 'handshake', 'hugging', 'brotherhood', 'blow-a-kiss', 'custom', 'static'));
 
 create or replace function public.set_updated_at()
 returns trigger

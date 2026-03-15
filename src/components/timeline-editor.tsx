@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import {
   DndContext,
@@ -11,22 +12,24 @@ import {
 import {
   SortableContext,
   arrayMove,
+  horizontalListSortingStrategy,
   useSortable,
-  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { fetchFile } from "@ffmpeg/util";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import Link from "next/link";
-import { useMemo, useRef, useState, useTransition } from "react";
-import { GripVertical } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { GripVertical, RefreshCcw, Trash2, VideoOff } from "lucide-react";
 
 import {
   FRAME_STYLE_OPTIONS,
+  MAX_REGENERATION_COUNT,
+  PROMPT_OPTIONS,
   THEME_OPTIONS,
   TRANSITION_OPTIONS,
 } from "@/lib/constants";
-import type { ProjectAsset, TimelineUpdateItem } from "@/lib/types";
+import type { ProjectAsset, PromptKey, TimelineUpdateItem } from "@/lib/types";
 
 interface TimelineEditorProps {
   projectId: string;
@@ -113,16 +116,14 @@ function buildFilterGraph(assets: ProjectAsset[]) {
   return { filter: filters.join(";"), outputLabel: currentLabel };
 }
 
-function SortableClip({
+function SortableTimelineClip({
   asset,
-  onSelectChange,
+  isSelected,
+  onSelect,
 }: {
   asset: ProjectAsset;
-  onSelectChange: (
-    assetId: string,
-    field: "transitionKey" | "themeKey" | "frameStyleKey",
-    value: string,
-  ) => void;
+  isSelected: boolean;
+  onSelect: (assetId: string) => void;
 }) {
   const {
     attributes,
@@ -130,7 +131,6 @@ function SortableClip({
     setNodeRef,
     transform,
     transition,
-    isDragging,
   } = useSortable({ id: asset.id });
 
   const style = {
@@ -138,99 +138,66 @@ function SortableClip({
     transition,
   };
 
-  const theme = THEME_OPTIONS.find((option) => option.key === asset.themeKey) ?? THEME_OPTIONS[0];
-
   return (
     <article
       ref={setNodeRef}
       style={style}
-      className="grid gap-4 border border-[var(--line)] bg-[var(--surface)] p-4"
-      data-dragging={isDragging}
+      className={`grid min-w-[190px] gap-3 border p-3 transition ${
+        isSelected ? "border-[var(--text)] bg-[var(--surface)]" : "border-[var(--line)]"
+      }`}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-            Clip
-          </p>
-          <h3 className="max-w-[18rem] text-lg tracking-tight">{asset.fileName}</h3>
+      <button
+        type="button"
+        className="grid gap-3 text-left"
+        onClick={() => onSelect(asset.id)}
+      >
+        <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">
+          <span>{asset.isStaticClip ? "static" : "video"}</span>
+          <span>{asset.fileName}</span>
+        </div>
+        <div className="grid h-[110px] place-items-center overflow-hidden border border-[var(--line)] bg-black">
+          {asset.isStaticClip ? (
+            <img
+              src={asset.originalUrl}
+              alt={asset.fileName}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <video
+              src={asset.generatedUrl ?? undefined}
+              className="h-full w-full object-cover"
+              muted
+            />
+          )}
+        </div>
+      </button>
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">
+          {asset.regenerationCount}/{MAX_REGENERATION_COUNT} re-gen
         </div>
         <button
           type="button"
-          className="grid h-10 w-10 place-items-center border border-[var(--line)]"
+          className="grid h-9 w-9 place-items-center border border-[var(--line)]"
           {...attributes}
           {...listeners}
+          aria-label={`排序 ${asset.fileName}`}
         >
-          <GripVertical size={16} />
+          <GripVertical size={14} />
         </button>
-      </div>
-
-      <div
-        className="grid min-h-56 place-items-center border p-4"
-        style={{
-          borderColor: theme.border,
-          backgroundColor: theme.background,
-          color: theme.text,
-        }}
-      >
-        <video
-          src={asset.generatedUrl ?? undefined}
-          className="aspect-video w-full border border-current object-cover"
-          controls
-        />
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-3">
-        <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-          Transition
-          <select
-            className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
-            value={asset.transitionKey}
-            onChange={(event) =>
-              onSelectChange(asset.id, "transitionKey", event.target.value)
-            }
-          >
-            {TRANSITION_OPTIONS.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-          Theme
-          <select
-            className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
-            value={asset.themeKey}
-            onChange={(event) =>
-              onSelectChange(asset.id, "themeKey", event.target.value)
-            }
-          >
-            {THEME_OPTIONS.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-          Frame
-          <select
-            className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
-            value={asset.frameStyleKey}
-            onChange={(event) =>
-              onSelectChange(asset.id, "frameStyleKey", event.target.value)
-            }
-          >
-            {FRAME_STYLE_OPTIONS.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
     </article>
   );
+}
+
+async function parseApiResponse(response: Response) {
+  const rawText = await response.text();
+
+  try {
+    return JSON.parse(rawText) as { error?: string; project?: { name: string }; assets?: ProjectAsset[] };
+  } catch {
+    throw new Error(rawText || `請求失敗 (${response.status})`);
+  }
 }
 
 export function TimelineEditor({
@@ -239,11 +206,37 @@ export function TimelineEditor({
 }: TimelineEditorProps) {
   const sensors = useSensors(useSensor(PointerSensor));
   const [assets, setAssets] = useState(initialAssets);
+  const [selectedAssetId, setSelectedAssetId] = useState(initialAssets[0]?.id ?? null);
+  const [regeneratePromptKey, setRegeneratePromptKey] = useState<PromptKey>("smile");
+  const [regenerateCustomPrompt, setRegenerateCustomPrompt] = useState("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [isPending, startTransition] = useTransition();
   const ffmpegRef = useRef<FFmpeg | null>(null);
+
+  useEffect(() => {
+    if (!selectedAssetId && assets[0]) {
+      setSelectedAssetId(assets[0].id);
+      return;
+    }
+
+    if (selectedAssetId && !assets.some((asset) => asset.id === selectedAssetId)) {
+      setSelectedAssetId(assets[0]?.id ?? null);
+    }
+  }, [assets, selectedAssetId]);
+
+  const selectedAsset =
+    assets.find((asset) => asset.id === selectedAssetId) ?? assets[0] ?? null;
+
+  useEffect(() => {
+    if (!selectedAsset) {
+      return;
+    }
+
+    setRegeneratePromptKey(selectedAsset.promptKey ?? "smile");
+    setRegenerateCustomPrompt(selectedAsset.customPrompt ?? "");
+  }, [selectedAsset]);
 
   const orderedIds = useMemo(() => assets.map((asset) => asset.id), [assets]);
 
@@ -259,14 +252,17 @@ export function TimelineEditor({
     setAssets((current) => arrayMove(current, oldIndex, newIndex));
   }
 
-  function handleSelectChange(
-    assetId: string,
+  function handleSelectedFieldChange(
     field: "transitionKey" | "themeKey" | "frameStyleKey",
     value: string,
   ) {
+    if (!selectedAsset) {
+      return;
+    }
+
     setAssets((current) =>
       current.map((asset) =>
-        asset.id === assetId
+        asset.id === selectedAsset.id
           ? {
               ...asset,
               [field]: value,
@@ -297,7 +293,7 @@ export function TimelineEditor({
         body: JSON.stringify({ items: payload }),
       });
 
-      const data = await response.json();
+      const data = await parseApiResponse(response);
 
       if (!response.ok) {
         setError(data.error ?? "儲存時間線失敗。");
@@ -306,6 +302,97 @@ export function TimelineEditor({
 
       setStatusMessage("時間線已儲存。");
     });
+  }
+
+  async function deleteClip() {
+    if (!selectedAsset) {
+      return;
+    }
+
+    const confirmed = window.confirm("刪除此片段後不能還原，是否繼續？");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError(null);
+    const response = await fetch(`/api/projects/${projectId}/assets/${selectedAsset.id}`, {
+      method: "DELETE",
+    });
+    const data = await parseApiResponse(response);
+
+    if (!response.ok) {
+      setError(data.error ?? "刪除片段失敗。");
+      return;
+    }
+
+    setAssets((current) => current.filter((asset) => asset.id !== selectedAsset.id));
+    setStatusMessage("片段已刪除。");
+  }
+
+  async function deleteGenerated() {
+    if (!selectedAsset) {
+      return;
+    }
+
+    const confirmed = window.confirm("刪除生成結果後，該相片會回到待生成狀態，是否繼續？");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError(null);
+    const response = await fetch(
+      `/api/projects/${projectId}/assets/${selectedAsset.id}/generated`,
+      {
+        method: "DELETE",
+      },
+    );
+    const data = await parseApiResponse(response);
+
+    if (!response.ok) {
+      setError(data.error ?? "刪除影片失敗。");
+      return;
+    }
+
+    window.location.href = `/projects/${projectId}`;
+  }
+
+  async function regenerateSelected() {
+    if (!selectedAsset) {
+      return;
+    }
+
+    if (
+      regeneratePromptKey === "custom" &&
+      !regenerateCustomPrompt.trim()
+    ) {
+      setError("選擇「其他動作」時請輸入 prompt。");
+      return;
+    }
+
+    setError(null);
+    const response = await fetch(
+      `/api/projects/${projectId}/assets/${selectedAsset.id}/regenerate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          promptKey: regeneratePromptKey,
+          customPrompt: regenerateCustomPrompt,
+        }),
+      },
+    );
+    const data = await parseApiResponse(response);
+
+    if (!response.ok) {
+      setError(data.error ?? "重新生成失敗。");
+      return;
+    }
+
+    window.location.href = `/projects/${projectId}/waiting`;
   }
 
   async function exportVideo() {
@@ -317,7 +404,7 @@ export function TimelineEditor({
       const response = await fetch(`/api/projects/${projectId}/render`, {
         method: "POST",
       });
-      const data = await response.json();
+      const data = await parseApiResponse(response);
 
       if (!response.ok) {
         throw new Error(data.error ?? "載入匯出資料失敗。");
@@ -336,17 +423,35 @@ export function TimelineEditor({
         });
       }
 
+      const args: string[] = [];
+
       for (let index = 0; index < assets.length; index += 1) {
         const asset = assets[index];
+
+        if (asset.isStaticClip) {
+          await ffmpeg.writeFile(`clip-${index}.jpg`, await fetchFile(asset.originalUrl));
+          args.push(
+            "-loop",
+            "1",
+            "-framerate",
+            "30",
+            "-t",
+            String(asset.durationSeconds),
+            "-i",
+            `clip-${index}.jpg`,
+          );
+          continue;
+        }
+
         if (!asset.generatedUrl) {
           throw new Error(`片段 ${asset.fileName} 尚未完成生成。`);
         }
 
         await ffmpeg.writeFile(`clip-${index}.mp4`, await fetchFile(asset.generatedUrl));
+        args.push("-i", `clip-${index}.mp4`);
       }
 
       const filterGraph = buildFilterGraph(assets);
-      const args = assets.flatMap((_, index) => ["-i", `clip-${index}.mp4`]);
 
       await ffmpeg.exec([
         ...args,
@@ -372,7 +477,7 @@ export function TimelineEditor({
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${data.project.name}-final-cut.mp4`;
+      anchor.download = `${data.project?.name ?? "motioncut"}-final-cut.mp4`;
       anchor.click();
       URL.revokeObjectURL(url);
       setStatusMessage("影片已匯出並下載到電腦。");
@@ -383,6 +488,17 @@ export function TimelineEditor({
     }
   }
 
+  if (!selectedAsset) {
+    return (
+      <div className="grid min-h-80 place-items-center border border-dashed border-[var(--line)] text-sm text-[var(--muted)]">
+        目前沒有可剪輯片段。
+      </div>
+    );
+  }
+
+  const selectedTheme =
+    THEME_OPTIONS.find((item) => item.key === selectedAsset.themeKey) ?? THEME_OPTIONS[0];
+
   return (
     <div className="grid gap-8">
       <section className="grid gap-4 border border-[var(--line)] p-6">
@@ -392,7 +508,7 @@ export function TimelineEditor({
               Timeline
             </p>
             <h2 className="text-3xl tracking-tight">
-              拖放排序、調整過場、套用邊框與主題
+              橫向時間線排序與大 preview 剪輯
             </h2>
           </div>
 
@@ -421,29 +537,200 @@ export function TimelineEditor({
             </button>
           </div>
         </div>
-
-        <p className="max-w-3xl text-sm leading-6 text-[var(--muted)]">
-          這個版本採用瀏覽器內 ffmpeg.wasm 匯出，會依你設定的排序、過場、主題與邊框合成單一 MP4，適合直接在 Vercel 前端部署。
-        </p>
       </section>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
-          <div className="grid gap-4">
-            {assets.map((asset) => (
-              <SortableClip
-                key={asset.id}
-                asset={asset}
-                onSelectChange={handleSelectChange}
-              />
-            ))}
+      <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="grid gap-4 border border-[var(--line)] p-5">
+          <div className="flex items-center justify-between text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+            <span>Preview</span>
+            <span>{selectedAsset.fileName}</span>
           </div>
-        </SortableContext>
-      </DndContext>
+          <div
+            className="grid min-h-[420px] place-items-center border p-5"
+            style={{
+              borderColor: selectedTheme.border,
+              backgroundColor: selectedTheme.background,
+              color: selectedTheme.text,
+            }}
+          >
+            {selectedAsset.isStaticClip ? (
+              <img
+                src={selectedAsset.originalUrl}
+                alt={selectedAsset.fileName}
+                className="aspect-video w-full border border-current object-cover"
+              />
+            ) : (
+              <video
+                src={selectedAsset.generatedUrl ?? undefined}
+                className="aspect-video w-full border border-current object-cover"
+                controls
+              />
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-4 border border-[var(--line)] p-5">
+          <div className="grid gap-2">
+            <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
+              Selected clip
+            </p>
+            <h3 className="text-2xl tracking-tight">{selectedAsset.fileName}</h3>
+            <p className="text-sm leading-6 text-[var(--muted)]">
+              重新生成次數 {selectedAsset.regenerationCount}/{MAX_REGENERATION_COUNT}
+            </p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+              Transition
+              <select
+                className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
+                value={selectedAsset.transitionKey}
+                onChange={(event) =>
+                  handleSelectedFieldChange("transitionKey", event.target.value)
+                }
+              >
+                {TRANSITION_OPTIONS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+              Theme
+              <select
+                className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
+                value={selectedAsset.themeKey}
+                onChange={(event) =>
+                  handleSelectedFieldChange("themeKey", event.target.value)
+                }
+              >
+                {THEME_OPTIONS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+              Frame
+              <select
+                className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
+                value={selectedAsset.frameStyleKey}
+                onChange={(event) =>
+                  handleSelectedFieldChange("frameStyleKey", event.target.value)
+                }
+              >
+                {FRAME_STYLE_OPTIONS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid gap-3 border border-[var(--line)] bg-[var(--surface-soft)] p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+                  Regenerate
+                </p>
+                <h4 className="text-lg tracking-tight">重新選擇動作</h4>
+              </div>
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+                max {MAX_REGENERATION_COUNT}
+              </div>
+            </div>
+            <select
+              className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm outline-none focus:border-[var(--text)]"
+              value={regeneratePromptKey}
+              onChange={(event) => setRegeneratePromptKey(event.target.value as PromptKey)}
+              disabled={selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT}
+            >
+              {PROMPT_OPTIONS.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {regeneratePromptKey === "custom" ? (
+              <textarea
+                className="min-h-24 border border-[var(--line)] bg-transparent px-3 py-3 text-sm outline-none focus:border-[var(--text)]"
+                placeholder="輸入自訂動作 prompt"
+                value={regenerateCustomPrompt}
+                onChange={(event) => setRegenerateCustomPrompt(event.target.value)}
+                disabled={selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT}
+              />
+            ) : null}
+            <button
+              type="button"
+              className="inline-flex h-11 items-center justify-center gap-2 border border-[var(--text)] px-4 text-sm uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)] disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:text-[var(--muted)]"
+              onClick={regenerateSelected}
+              disabled={selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT}
+            >
+              <RefreshCcw size={15} />
+              {selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT
+                ? "已達上限，請刪除相片"
+                : "重新生成"}
+            </button>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              className="inline-flex h-11 items-center justify-center gap-2 border border-[var(--line)] px-4 text-sm uppercase tracking-[0.2em] transition hover:border-[#8d2f24] hover:text-[#8d2f24]"
+              onClick={deleteClip}
+            >
+              <Trash2 size={15} />
+              刪除相片
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-11 items-center justify-center gap-2 border border-[var(--line)] px-4 text-sm uppercase tracking-[0.2em] transition hover:border-[#8d2f24] hover:text-[#8d2f24]"
+              onClick={deleteGenerated}
+              disabled={selectedAsset.isStaticClip}
+            >
+              <VideoOff size={15} />
+              刪除已生成影片
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 border border-[var(--line)] p-5">
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
+              Horizontal timeline
+            </p>
+            <h3 className="text-2xl tracking-tight">拖動縮圖重新排序</h3>
+          </div>
+          <div className="text-sm text-[var(--muted)]">{assets.length} clips</div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={orderedIds} strategy={horizontalListSortingStrategy}>
+              <div className="flex min-w-max gap-4 pb-2">
+                {assets.map((asset) => (
+                  <SortableTimelineClip
+                    key={asset.id}
+                    asset={asset}
+                    isSelected={asset.id === selectedAsset.id}
+                    onSelect={setSelectedAssetId}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </div>
+      </section>
 
       {statusMessage ? <p className="text-sm text-[#2e5a31]">{statusMessage}</p> : null}
       {error ? <p className="text-sm text-[#8d2f24]">{error}</p> : null}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { DeleteProjectButton } from "@/components/delete-project-button";
 import { UploadPromptBoard } from "@/components/upload-prompt-board";
 import { getProjectDetails } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
@@ -39,12 +40,15 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
             </p>
             <h1 className="text-4xl tracking-[-0.05em]">{project.name}</h1>
           </div>
-          <Link
-            href="/"
-            className="inline-flex h-12 items-center justify-center border border-[var(--line)] px-5 text-sm uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
-          >
-            返回首頁
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/"
+              className="inline-flex h-12 items-center justify-center border border-[var(--line)] px-5 text-sm uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
+            >
+              返回首頁
+            </Link>
+            <DeleteProjectButton projectId={projectId} />
+          </div>
         </div>
         <div className="grid gap-3 border-t border-[var(--line)] pt-4 text-sm text-[var(--muted)] md:grid-cols-3">
           <div>建立時間：<span className="text-[var(--text)]">{formatDate(project.createdAt)}</span></div>

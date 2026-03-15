@@ -1,6 +1,10 @@
 import crypto from "node:crypto";
 
-import { GENERATED_BUCKET } from "@/lib/constants";
+import {
+  DEFAULT_CLIP_DURATION,
+  GENERATED_BUCKET,
+  MAX_REGENERATION_COUNT,
+} from "@/lib/constants";
 import { getPromptLabel, slugifyFileName } from "@/lib/utils";
 import { assertSupabaseAdmin, getSupabaseAdmin } from "@/lib/supabase";
 import type {
@@ -29,8 +33,11 @@ type AssetRow = {
   generated_url: string | null;
   prompt_key: PromptKey | null;
   prompt_label: string | null;
+  custom_prompt: string | null;
   generation_status: AssetGenerationStatus;
   kling_task_id: string | null;
+  regeneration_count: number | null;
+  is_static_clip: boolean | null;
   timeline_order: number;
   transition_key: ProjectAsset["transitionKey"];
   theme_key: ProjectAsset["themeKey"];
@@ -50,13 +57,16 @@ function mapAsset(row: AssetRow): ProjectAsset {
     generatedUrl: row.generated_url,
     promptKey: row.prompt_key,
     promptLabel: row.prompt_label,
+    customPrompt: row.custom_prompt,
     generationStatus: row.generation_status,
     klingTaskId: row.kling_task_id,
+    regenerationCount: row.regeneration_count ?? 0,
+    isStaticClip: Boolean(row.is_static_clip),
     timelineOrder: row.timeline_order,
     transitionKey: row.transition_key,
     themeKey: row.theme_key,
     frameStyleKey: row.frame_style_key,
-    durationSeconds: row.duration_seconds ?? 5,
+    durationSeconds: row.duration_seconds ?? DEFAULT_CLIP_DURATION,
     errorMessage: row.error_message,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -77,6 +87,62 @@ function buildSummary(project: ProjectRow, assets: ProjectAsset[]): ProjectSumma
     createdAt: project.created_at,
     updatedAt: project.updated_at,
   };
+}
+
+function toStoragePath(publicUrl: string) {
+  try {
+    const url = new URL(publicUrl);
+    const marker = "/storage/v1/object/public/";
+    const index = url.pathname.indexOf(marker);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const remainder = url.pathname.slice(index + marker.length);
+    const slashIndex = remainder.indexOf("/");
+
+    if (slashIndex === -1) {
+      return null;
+    }
+
+    return {
+      bucket: remainder.slice(0, slashIndex),
+      path: remainder.slice(slashIndex + 1),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function deleteStorageObject(publicUrl: string | null) {
+  if (!publicUrl) {
+    return;
+  }
+
+  const parsed = toStoragePath(publicUrl);
+
+  if (!parsed) {
+    return;
+  }
+
+  const client = assertSupabaseAdmin();
+  await client.storage.from(parsed.bucket).remove([parsed.path]);
+}
+
+async function listAssetsForProject(projectId: string) {
+  const client = assertSupabaseAdmin();
+  const { data, error } = await client
+    .from("project_assets")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("timeline_order", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as AssetRow[]).map(mapAsset);
 }
 
 export function isSupabaseConfigured() {
@@ -104,7 +170,6 @@ export async function listProjects(): Promise<ProjectSummary[]> {
 
   const projectRows = (projects ?? []) as ProjectRow[];
   const projectIds = projectRows.map((project) => project.id);
-
   const assetsByProject = new Map<string, ProjectAsset[]>();
 
   if (projectIds.length > 0) {
@@ -154,17 +219,8 @@ export async function getProjectDetails(
     return null;
   }
 
-  const { data: assets, error: assetsError } = await client
-    .from("project_assets")
-    .select("*")
-    .eq("project_id", projectId)
-    .order("timeline_order", { ascending: true });
+  const mappedAssets = await listAssetsForProject(projectId);
 
-  if (assetsError) {
-    throw new Error(assetsError.message);
-  }
-
-  const mappedAssets = ((assets ?? []) as AssetRow[]).map(mapAsset);
   return {
     ...buildSummary(project as ProjectRow, mappedAssets),
     assets: mappedAssets,
@@ -190,6 +246,22 @@ export async function createProject(name: string) {
   return data as ProjectRow;
 }
 
+export async function deleteProject(projectId: string) {
+  const client = assertSupabaseAdmin();
+  const assets = await listAssetsForProject(projectId);
+
+  for (const asset of assets) {
+    await deleteStorageObject(asset.generatedUrl);
+    await deleteStorageObject(asset.originalUrl);
+  }
+
+  const { error } = await client.from("projects").delete().eq("id", projectId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function insertUploadedAsset(input: {
   projectId: string;
   fileName: string;
@@ -210,6 +282,8 @@ export async function insertUploadedAsset(input: {
       original_url: input.originalUrl,
       generation_status: "uploaded",
       timeline_order: count ?? 0,
+      regeneration_count: 0,
+      is_static_clip: false,
     })
     .select("*")
     .single();
@@ -222,20 +296,99 @@ export async function insertUploadedAsset(input: {
   return mapAsset(data as AssetRow);
 }
 
+export async function deleteAsset(projectId: string, assetId: string) {
+  const client = assertSupabaseAdmin();
+  const { data, error } = await client
+    .from("project_assets")
+    .select("*")
+    .eq("project_id", projectId)
+    .eq("id", assetId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const asset = mapAsset(data as AssetRow);
+  await deleteStorageObject(asset.generatedUrl);
+  await deleteStorageObject(asset.originalUrl);
+
+  const { error: deleteError } = await client
+    .from("project_assets")
+    .delete()
+    .eq("id", assetId)
+    .eq("project_id", projectId);
+
+  if (deleteError) {
+    throw new Error(deleteError.message);
+  }
+
+  await resequenceAssets(projectId);
+  return refreshProjectStatus(projectId);
+}
+
+export async function deleteGeneratedOutput(projectId: string, assetId: string) {
+  const client = assertSupabaseAdmin();
+  const { data, error } = await client
+    .from("project_assets")
+    .select("*")
+    .eq("project_id", projectId)
+    .eq("id", assetId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const asset = mapAsset(data as AssetRow);
+  await deleteStorageObject(asset.generatedUrl);
+
+  const { error: updateError } = await client
+    .from("project_assets")
+    .update({
+      generated_url: null,
+      kling_task_id: null,
+      generation_status: "uploaded",
+      is_static_clip: false,
+      error_message: null,
+    })
+    .eq("project_id", projectId)
+    .eq("id", assetId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  return refreshProjectStatus(projectId);
+}
+
 export async function savePromptSelections(
   projectId: string,
-  selections: Array<{ id: string; promptKey: PromptKey }>,
+  selections: Array<{ id: string; promptKey: PromptKey; customPrompt?: string | null }>,
 ) {
   const client = assertSupabaseAdmin();
 
   for (const selection of selections) {
     const promptLabel = getPromptLabel(selection.promptKey);
+    const customPrompt =
+      selection.promptKey === "custom"
+        ? selection.customPrompt?.trim() ?? null
+        : null;
 
     const { error } = await client
       .from("project_assets")
       .update({
         prompt_key: selection.promptKey,
         prompt_label: promptLabel,
+        custom_prompt: customPrompt,
       })
       .eq("project_id", projectId)
       .eq("id", selection.id);
@@ -250,18 +403,103 @@ export async function markAssetQueued(input: {
   assetId: string;
   promptKey: PromptKey;
   klingTaskId: string;
+  customPrompt?: string | null;
+  isRegeneration?: boolean;
 }) {
   const client = assertSupabaseAdmin();
+  const { data: existingAsset, error: existingError } = await client
+    .from("project_assets")
+    .select("generated_url, regeneration_count")
+    .eq("id", input.assetId)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  if (existingAsset?.generated_url) {
+    await deleteStorageObject(existingAsset.generated_url);
+  }
+
+  const updates: Record<string, unknown> = {
+    prompt_key: input.promptKey,
+    prompt_label: getPromptLabel(input.promptKey),
+    custom_prompt: input.promptKey === "custom" ? input.customPrompt?.trim() ?? null : null,
+    kling_task_id: input.klingTaskId,
+    generated_url: null,
+    generation_status: "queued",
+    is_static_clip: false,
+    error_message: null,
+  };
+
+  if (input.isRegeneration) {
+    const regenerationCount = Number(existingAsset?.regeneration_count ?? 0);
+
+    if (regenerationCount >= MAX_REGENERATION_COUNT) {
+      throw new Error("已達重新生成上限。請刪除相片後重新上傳。");
+    }
+
+    updates.regeneration_count = regenerationCount + 1;
+  }
 
   const { error } = await client
     .from("project_assets")
-    .update({
-      prompt_key: input.promptKey,
-      prompt_label: getPromptLabel(input.promptKey),
-      kling_task_id: input.klingTaskId,
-      generation_status: "queued",
-      error_message: null,
-    })
+    .update(updates)
+    .eq("id", input.assetId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function markAssetStaticCompleted(input: {
+  projectId: string;
+  assetId: string;
+  promptKey: PromptKey;
+  customPrompt?: string | null;
+  isRegeneration?: boolean;
+}) {
+  const client = assertSupabaseAdmin();
+  const { data: existingAsset, error: existingError } = await client
+    .from("project_assets")
+    .select("generated_url, regeneration_count")
+    .eq("id", input.assetId)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  if (existingAsset?.generated_url) {
+    await deleteStorageObject(existingAsset.generated_url);
+  }
+
+  const updates: Record<string, unknown> = {
+    prompt_key: input.promptKey,
+    prompt_label: getPromptLabel(input.promptKey),
+    custom_prompt: input.promptKey === "custom" ? input.customPrompt?.trim() ?? null : null,
+    generated_url: null,
+    kling_task_id: null,
+    generation_status: "completed",
+    is_static_clip: true,
+    error_message: null,
+    duration_seconds: DEFAULT_CLIP_DURATION,
+  };
+
+  if (input.isRegeneration) {
+    const regenerationCount = Number(existingAsset?.regeneration_count ?? 0);
+
+    if (regenerationCount >= MAX_REGENERATION_COUNT) {
+      throw new Error("已達重新生成上限。請刪除相片後重新上傳。");
+    }
+
+    updates.regeneration_count = regenerationCount + 1;
+  }
+
+  const { error } = await client
+    .from("project_assets")
+    .update(updates)
+    .eq("project_id", input.projectId)
     .eq("id", input.assetId);
 
   if (error) {
@@ -334,23 +572,6 @@ export async function getGeneratingAssets(projectId: string) {
   return ((data ?? []) as AssetRow[]).map(mapAsset);
 }
 
-export async function getCompletedAssets(projectId: string) {
-  const client = assertSupabaseAdmin();
-
-  const { data, error } = await client
-    .from("project_assets")
-    .select("*")
-    .eq("project_id", projectId)
-    .eq("generation_status", "completed")
-    .order("timeline_order", { ascending: true });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return ((data ?? []) as AssetRow[]).map(mapAsset);
-}
-
 export async function persistGeneratedVideo(input: {
   projectId: string;
   assetId: string;
@@ -358,6 +579,7 @@ export async function persistGeneratedVideo(input: {
   durationSeconds: number;
 }) {
   const client = assertSupabaseAdmin();
+  const existing = await getAssetById(input.projectId, input.assetId);
   const response = await fetch(input.sourceUrl);
 
   if (!response.ok) {
@@ -379,6 +601,10 @@ export async function persistGeneratedVideo(input: {
     throw new Error(uploadError.message);
   }
 
+  if (existing?.generatedUrl) {
+    await deleteStorageObject(existing.generatedUrl);
+  }
+
   const { data } = client.storage.from(GENERATED_BUCKET).getPublicUrl(storagePath);
 
   const { error } = await client
@@ -386,9 +612,11 @@ export async function persistGeneratedVideo(input: {
     .update({
       generated_url: data.publicUrl,
       generation_status: "completed",
+      is_static_clip: false,
       duration_seconds: input.durationSeconds,
       error_message: null,
     })
+    .eq("project_id", input.projectId)
     .eq("id", input.assetId);
 
   if (error) {
@@ -417,7 +645,7 @@ export async function refreshProjectStatus(projectId: string) {
         ? "ready"
         : hasPending
           ? "generating"
-          : project.status;
+          : "draft";
 
   if (nextStatus !== project.status) {
     await touchProject(projectId, nextStatus);
@@ -452,48 +680,43 @@ export async function saveTimeline(
   await touchProject(projectId, "ready");
 }
 
-export async function createRenderRequest(projectId: string) {
-  const client = assertSupabaseAdmin();
-
-  const { data, error } = await client
-    .from("render_jobs")
-    .insert({
-      project_id: projectId,
-      status: "prepared",
-    })
-    .select("*")
-    .single();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  await touchProject(projectId, "rendering");
-  return data;
-}
-
-export async function finishRenderRequest(input: {
-  renderId: string;
-  outputUrl: string;
-  projectId: string;
-}) {
-  const client = assertSupabaseAdmin();
-
-  const { error } = await client
-    .from("render_jobs")
-    .update({
-      status: "completed",
-      output_url: input.outputUrl,
-    })
-    .eq("id", input.renderId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  await touchProject(input.projectId, "rendered");
-}
-
 export function buildOriginalStoragePath(projectId: string, fileName: string) {
   return `${projectId}/${crypto.randomUUID()}-${slugifyFileName(fileName)}`;
+}
+
+export function canRegenerate(asset: Pick<ProjectAsset, "regenerationCount">) {
+  return asset.regenerationCount < MAX_REGENERATION_COUNT;
+}
+
+async function getAssetById(projectId: string, assetId: string) {
+  const client = assertSupabaseAdmin();
+  const { data, error } = await client
+    .from("project_assets")
+    .select("*")
+    .eq("project_id", projectId)
+    .eq("id", assetId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ? mapAsset(data as AssetRow) : null;
+}
+
+async function resequenceAssets(projectId: string) {
+  const client = assertSupabaseAdmin();
+  const assets = await listAssetsForProject(projectId);
+
+  for (const [index, asset] of assets.entries()) {
+    const { error } = await client
+      .from("project_assets")
+      .update({ timeline_order: index })
+      .eq("project_id", projectId)
+      .eq("id", asset.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
 }

@@ -12,13 +12,15 @@ export const GENERATED_BUCKET = "project-generated";
 export const RENDER_BUCKET = "project-renders";
 
 export const PROMPT_OPTIONS: PromptOption[] = [
-  { key: "smile", label: "微笑 Smile", prompt: "A natural warm smile, subtle head movement, eye contact, realistic motion." },
-  { key: "greeting", label: "打招呼 Greeting", prompt: "Raise one hand and greet the camera with a calm, friendly wave and natural body motion." },
-  { key: "laughing", label: "大笑 Laughing", prompt: "Burst into genuine laughter with lively shoulders, expressive face, and natural movement." },
-  { key: "handshake", label: "握手 Handshake", prompt: "Reach forward for a friendly handshake gesture, confident body language, realistic motion." },
-  { key: "hugging", label: "擁抱 Hugging", prompt: "Open both arms slightly as if inviting a hug, warm emotion, gentle cinematic movement." },
-  { key: "brotherhood", label: "手足情誼 Brotherhood", prompt: "Show a strong brotherhood vibe with shoulder movement, pride, solidarity, and relaxed energy." },
-  { key: "blow-a-kiss", label: "飛吻 Blow a kiss", prompt: "Blow a kiss toward camera, soft hand movement, affectionate expression, realistic motion." },
+  { key: "smile", label: "微笑 Smile", prompt: "向鏡頭微笑" },
+  { key: "greeting", label: "打招呼 Greeting", prompt: "向鏡頭打招呼" },
+  { key: "laughing", label: "大笑 Laughing", prompt: "向相片其他人大笑後再望向鏡頭" },
+  { key: "handshake", label: "握手 Handshake", prompt: "與相片中其他人握手" },
+  { key: "hugging", label: "擁抱 Hugging", prompt: "與相片中其他人擁抱" },
+  { key: "brotherhood", label: "手足情誼 Brotherhood", prompt: "與相片中其他人搭膊頭" },
+  { key: "blow-a-kiss", label: "飛吻 Blow a kiss", prompt: "相中人向鏡頭飛吻" },
+  { key: "custom", label: "其他動作", prompt: "" },
+  { key: "static", label: "不用生成動作", prompt: "" },
 ];
 
 export const TRANSITION_OPTIONS: TransitionOption[] = [
@@ -46,3 +48,4 @@ export const DEFAULT_THEME_KEY = "editorial";
 export const DEFAULT_TRANSITION_KEY = "fade";
 export const DEFAULT_FRAME_STYLE_KEY = "single";
 export const DEFAULT_CLIP_DURATION = 5;
+export const MAX_REGENERATION_COUNT = 3;

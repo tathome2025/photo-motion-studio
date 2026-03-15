@@ -7,34 +7,47 @@ import {
   getProjectDetails,
   markAssetFailed,
   markAssetQueued,
+  markAssetStaticCompleted,
   markProjectStatus,
   savePromptSelections,
 } from "@/lib/data";
 import { createKlingImageToVideoTask } from "@/lib/kling";
-import type { PromptKey } from "@/lib/types";
 
-const payloadSchema = z.object({
-  selections: z.array(
-    z.object({
-      id: z.string().uuid(),
-      promptKey: z.enum([
-        "smile",
-        "greeting",
-        "laughing",
-        "handshake",
-        "hugging",
-        "brotherhood",
-        "blow-a-kiss",
-      ]),
-    }),
-  ),
+const selectionSchema = z.object({
+  id: z.string().uuid(),
+  promptKey: z.enum([
+    "smile",
+    "greeting",
+    "laughing",
+    "handshake",
+    "hugging",
+    "brotherhood",
+    "blow-a-kiss",
+    "custom",
+    "static",
+  ]),
+  customPrompt: z.string().trim().max(280).optional().nullable(),
 });
 
-function getPromptText(promptKey: PromptKey) {
-  const match = PROMPT_OPTIONS.find((option) => option.key === promptKey);
+const payloadSchema = z.object({
+  selections: z.array(selectionSchema),
+});
+
+function getPromptText(selection: z.infer<typeof selectionSchema>) {
+  if (selection.promptKey === "custom") {
+    const prompt = selection.customPrompt?.trim();
+
+    if (!prompt) {
+      throw new Error("選擇「其他動作」時必須輸入 prompt。");
+    }
+
+    return prompt;
+  }
+
+  const match = PROMPT_OPTIONS.find((option) => option.key === selection.promptKey);
 
   if (!match) {
-    throw new Error(`找不到 prompt: ${promptKey}`);
+    throw new Error(`找不到 prompt: ${selection.promptKey}`);
   }
 
   return match.prompt;
@@ -75,15 +88,26 @@ export async function POST(
       }
 
       try {
+        if (selection.promptKey === "static") {
+          await markAssetStaticCompleted({
+            projectId,
+            assetId: asset.id,
+            promptKey: selection.promptKey,
+          });
+          queuedCount += 1;
+          continue;
+        }
+
         const task = await createKlingImageToVideoTask({
           imageUrl: asset.originalUrl,
-          prompt: getPromptText(selection.promptKey),
+          prompt: getPromptText(selection),
           callbackUrl: `${appUrl}/api/kling/callback?projectId=${projectId}&assetId=${asset.id}`,
         });
 
         await markAssetQueued({
           assetId: asset.id,
           promptKey: selection.promptKey,
+          customPrompt: selection.customPrompt,
           klingTaskId: task.taskId,
         });
 
@@ -92,10 +116,7 @@ export async function POST(
         const message =
           reason instanceof Error ? reason.message : "提交 Kling 任務失敗。";
 
-        await markAssetFailed(
-          asset.id,
-          message,
-        );
+        await markAssetFailed(asset.id, message);
         failedMessages.push(`${asset.fileName}: ${message}`);
       }
     }

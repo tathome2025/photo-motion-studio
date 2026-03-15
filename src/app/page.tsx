@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { CreateProjectForm } from "@/components/create-project-form";
+import { DeleteProjectButton } from "@/components/delete-project-button";
 import { APP_NAME } from "@/lib/constants";
 import { isSupabaseConfigured, listProjects } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
@@ -89,18 +90,20 @@ export default async function HomePage() {
           ) : (
             <div className="grid gap-4 xl:grid-cols-2">
               {projects.map((project) => (
-                <Link
+                <article
                   key={project.id}
-                  href={getProjectLink(project.id, project.status)}
                   className="grid gap-6 border border-[var(--line)] p-5 transition hover:border-[var(--text)]"
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-2">
+                    <Link
+                      href={getProjectLink(project.id, project.status)}
+                      className="space-y-2"
+                    >
                       <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
                         {project.status}
                       </p>
                       <h3 className="text-2xl tracking-tight">{project.name}</h3>
-                    </div>
+                    </Link>
                     <div className="text-right text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
                       {project.completedCount}/{project.assetCount}
                     </div>
@@ -116,7 +119,16 @@ export default async function HomePage() {
                       {formatDate(project.updatedAt)}
                     </div>
                   </div>
-                </Link>
+                  <div className="flex justify-between gap-3">
+                    <Link
+                      href={getProjectLink(project.id, project.status)}
+                      className="inline-flex h-10 items-center justify-center border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
+                    >
+                      開啟專案
+                    </Link>
+                    <DeleteProjectButton projectId={project.id} compact />
+                  </div>
+                </article>
               ))}
             </div>
           )}

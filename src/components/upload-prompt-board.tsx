@@ -3,13 +3,83 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+import { Trash2 } from "lucide-react";
 
-import { PROMPT_OPTIONS } from "@/lib/constants";
+import { MAX_REGENERATION_COUNT, PROMPT_OPTIONS } from "@/lib/constants";
 import type { ProjectAsset, PromptKey } from "@/lib/types";
 
 interface UploadPromptBoardProps {
   projectId: string;
   initialAssets: ProjectAsset[];
+}
+
+interface ApiResponse {
+  error?: string;
+  assets?: ProjectAsset[];
+  project?: {
+    id: string;
+  };
+}
+
+function formatSpeed(bytesPerSecond: number) {
+  if (bytesPerSecond <= 0) {
+    return "0 KB/s";
+  }
+
+  if (bytesPerSecond >= 1024 * 1024) {
+    return `${(bytesPerSecond / 1024 / 1024).toFixed(2)} MB/s`;
+  }
+
+  return `${(bytesPerSecond / 1024).toFixed(0)} KB/s`;
+}
+
+async function parseApiResponse(response: Response) {
+  const rawText = await response.text();
+
+  try {
+    return JSON.parse(rawText) as ApiResponse;
+  } catch {
+    if (response.status === 413 || rawText.startsWith("Request Entity Too Large")) {
+      throw new Error("單次 request 太大。系統會逐張上傳，請重新選擇相片後再試。");
+    }
+
+    throw new Error(rawText || `請求失敗 (${response.status})`);
+  }
+}
+
+function uploadFileWithProgress(
+  url: string,
+  file: File,
+  onProgress: (loadedBytes: number, elapsedMs: number) => void,
+) {
+  return new Promise<Response>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    const startedAt = performance.now();
+    formData.append("files", file);
+
+    xhr.open("POST", url);
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) {
+        return;
+      }
+
+      onProgress(event.loaded, performance.now() - startedAt);
+    };
+    xhr.onerror = () => reject(new Error("上傳失敗。"));
+    xhr.onload = () => {
+      resolve(
+        new Response(xhr.responseText, {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          headers: {
+            "Content-Type": xhr.getResponseHeader("Content-Type") ?? "application/json",
+          },
+        }),
+      );
+    };
+    xhr.send(formData);
+  });
 }
 
 export function UploadPromptBoard({
@@ -20,8 +90,11 @@ export function UploadPromptBoard({
   const [assets, setAssets] = useState(initialAssets);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
-    current: number;
-    total: number;
+    currentFile: number;
+    totalFiles: number;
+    loadedBytes: number;
+    totalBytes: number;
+    speed: string;
   } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
@@ -29,26 +102,21 @@ export function UploadPromptBoard({
 
   const hasAssets = assets.length > 0;
   const allPromptSelected = useMemo(
-    () => assets.length > 0 && assets.every((asset) => Boolean(asset.promptKey)),
+    () =>
+      assets.length > 0 &&
+      assets.every((asset) => {
+        if (!asset.promptKey) {
+          return false;
+        }
+
+        if (asset.promptKey === "custom") {
+          return Boolean(asset.customPrompt?.trim());
+        }
+
+        return true;
+      }),
     [assets],
   );
-
-  async function parseApiResponse(response: Response) {
-    const rawText = await response.text();
-
-    try {
-      return JSON.parse(rawText) as {
-        error?: string;
-        assets?: ProjectAsset[];
-      };
-    } catch {
-      if (response.status === 413 || rawText.startsWith("Request Entity Too Large")) {
-        throw new Error("單次 request 太大。系統已改為逐張上傳，但你這次請重新選擇相片再試。");
-      }
-
-      throw new Error(rawText || `請求失敗 (${response.status})`);
-    }
-  }
 
   async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -57,29 +125,37 @@ export function UploadPromptBoard({
       return;
     }
 
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+    let uploadedBytes = 0;
+
     setUploadError(null);
     setIsUploading(true);
     setUploadProgress({
-      current: 0,
-      total: files.length,
+      currentFile: 0,
+      totalFiles: files.length,
+      loadedBytes: 0,
+      totalBytes,
+      speed: "0 KB/s",
     });
 
     try {
       let latestAssets = assets;
 
       for (const [index, file] of files.entries()) {
-        setUploadProgress({
-          current: index + 1,
-          total: files.length,
-        });
-
-        const formData = new FormData();
-        formData.append("files", file);
-
-        const response = await fetch(`/api/projects/${projectId}/assets`, {
-          method: "POST",
-          body: formData,
-        });
+        const response = await uploadFileWithProgress(
+          `/api/projects/${projectId}/assets`,
+          file,
+          (loadedBytes, elapsedMs) => {
+            const speed = elapsedMs <= 0 ? 0 : (loadedBytes / elapsedMs) * 1000;
+            setUploadProgress({
+              currentFile: index + 1,
+              totalFiles: files.length,
+              loadedBytes: uploadedBytes + loadedBytes,
+              totalBytes,
+              speed: formatSpeed(speed),
+            });
+          },
+        );
 
         const data = await parseApiResponse(response);
 
@@ -89,8 +165,16 @@ export function UploadPromptBoard({
           );
         }
 
+        uploadedBytes += file.size;
         latestAssets = data.assets ?? latestAssets;
         setAssets(latestAssets);
+        setUploadProgress({
+          currentFile: index + 1,
+          totalFiles: files.length,
+          loadedBytes: uploadedBytes,
+          totalBytes,
+          speed: "0 KB/s",
+        });
       }
 
       router.refresh();
@@ -105,6 +189,23 @@ export function UploadPromptBoard({
     }
   }
 
+  async function handleDeleteAsset(assetId: string) {
+    setUploadError(null);
+
+    const response = await fetch(`/api/projects/${projectId}/assets/${assetId}`, {
+      method: "DELETE",
+    });
+    const data = await parseApiResponse(response);
+
+    if (!response.ok) {
+      setUploadError(data.error ?? "刪除相片失敗。");
+      return;
+    }
+
+    setAssets((current) => current.filter((asset) => asset.id !== assetId));
+    router.refresh();
+  }
+
   function handlePromptChange(assetId: string, promptKey: PromptKey) {
     setAssets((current) =>
       current.map((asset) =>
@@ -115,6 +216,21 @@ export function UploadPromptBoard({
               promptLabel:
                 PROMPT_OPTIONS.find((option) => option.key === promptKey)?.label ??
                 null,
+              customPrompt: promptKey === "custom" ? asset.customPrompt : null,
+              isStaticClip: promptKey === "static",
+            }
+          : asset,
+      ),
+    );
+  }
+
+  function handleCustomPromptChange(assetId: string, customPrompt: string) {
+    setAssets((current) =>
+      current.map((asset) =>
+        asset.id === assetId
+          ? {
+              ...asset,
+              customPrompt,
             }
           : asset,
       ),
@@ -134,11 +250,12 @@ export function UploadPromptBoard({
           selections: assets.map((asset) => ({
             id: asset.id,
             promptKey: asset.promptKey,
+            customPrompt: asset.customPrompt,
           })),
         }),
       });
 
-      const data = await response.json();
+      const data = await parseApiResponse(response);
 
       if (!response.ok) {
         setGenerateError(data.error ?? "提交生成工作失敗。");
@@ -149,10 +266,14 @@ export function UploadPromptBoard({
     });
   }
 
+  const uploadPercent = uploadProgress
+    ? Math.min((uploadProgress.loadedBytes / Math.max(uploadProgress.totalBytes, 1)) * 100, 100)
+    : 0;
+
   return (
     <div className="grid gap-8">
-      <section className="grid gap-4 border border-[var(--line)] p-5">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+      <section className="grid gap-5 border border-[var(--line)] p-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
               Batch upload
@@ -169,13 +290,35 @@ export function UploadPromptBoard({
               disabled={isUploading}
             />
             {isUploading
-              ? `上傳中 ${uploadProgress?.current ?? 0}/${uploadProgress?.total ?? 0}`
+              ? `上傳中 ${uploadProgress?.currentFile ?? 0}/${uploadProgress?.totalFiles ?? 0}`
               : "選擇相片"}
           </label>
         </div>
-        <p className="max-w-2xl text-sm leading-6 text-[var(--muted)]">
-          相片會先儲存到 Supabase Storage，頁面顯示的縮圖最大邊長會維持在 200px 內，方便快速檢查與批量指派動作 prompt。
-        </p>
+
+        <div className="grid gap-3 border border-[var(--line)] bg-[var(--surface-soft)] p-4 text-sm leading-7 text-[var(--muted)]">
+          <p>建議上傳面向鏡頭的合照以及橫向相片，生成效果最佳。</p>
+          <p>直向相片會自動在左右兩邊填充黑色，統一成橫向 16:9 方便後續生成與剪輯。</p>
+        </div>
+
+        {uploadProgress ? (
+          <div className="grid gap-3 border border-[var(--line)] p-4">
+            <div className="flex items-center justify-between text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+              <span>{uploadProgress.currentFile}/{uploadProgress.totalFiles} files</span>
+              <span>{uploadProgress.speed}</span>
+            </div>
+            <div className="relative h-3 overflow-hidden border border-[var(--line)] bg-[var(--surface)]">
+              <div className="absolute inset-0 progress-scan opacity-70" />
+              <div
+                className="h-full bg-[var(--text)] transition-[width] duration-300"
+                style={{ width: `${uploadPercent}%` }}
+              />
+            </div>
+            <div className="text-sm text-[var(--muted)]">
+              {Math.round(uploadPercent)}% completed
+            </div>
+          </div>
+        ) : null}
+
         {uploadError ? <p className="text-sm text-[#8d2f24]">{uploadError}</p> : null}
       </section>
 
@@ -208,16 +351,27 @@ export function UploadPromptBoard({
                 key={asset.id}
                 className="grid gap-3 border border-[var(--line)] p-4"
               >
-                <div className="flex items-center justify-between text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+                <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
                   <span>#{String(index + 1).padStart(2, "0")}</span>
-                  <span>{asset.fileName}</span>
+                  <button
+                    type="button"
+                    className="inline-flex h-9 w-9 items-center justify-center border border-[var(--line)] transition hover:border-[#8d2f24] hover:text-[#8d2f24]"
+                    onClick={() => handleDeleteAsset(asset.id)}
+                    aria-label={`刪除 ${asset.fileName}`}
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
-                <div className="grid min-h-[220px] place-items-center border border-[var(--line)] bg-[var(--surface-soft)] p-4">
+                <div className="grid min-h-[220px] place-items-center border border-[var(--line)] bg-black p-0">
                   <img
                     src={asset.originalUrl}
                     alt={asset.fileName}
-                    className="max-h-[200px] max-w-[200px] object-contain"
+                    className="aspect-video max-h-[200px] max-w-[200px] object-contain"
                   />
+                </div>
+                <div className="flex items-center justify-between text-xs text-[var(--muted)]">
+                  <span className="truncate">{asset.fileName}</span>
+                  <span>{asset.regenerationCount}/{MAX_REGENERATION_COUNT} re-gen</span>
                 </div>
                 <select
                   className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm outline-none focus:border-[var(--text)]"
@@ -233,6 +387,16 @@ export function UploadPromptBoard({
                     </option>
                   ))}
                 </select>
+                {asset.promptKey === "custom" ? (
+                  <textarea
+                    className="min-h-24 border border-[var(--line)] bg-transparent px-3 py-3 text-sm outline-none focus:border-[var(--text)]"
+                    placeholder="輸入你想要的自訂動作 prompt"
+                    value={asset.customPrompt ?? ""}
+                    onChange={(event) =>
+                      handleCustomPromptChange(asset.id, event.target.value)
+                    }
+                  />
+                ) : null}
               </article>
             ))}
           </div>

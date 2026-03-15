@@ -7,6 +7,7 @@ import {
   getProjectDetails,
   insertUploadedAsset,
 } from "@/lib/data";
+import { normalizeImageToLandscape } from "@/lib/image";
 import { assertSupabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -31,13 +32,14 @@ export async function POST(
     const supabase = assertSupabaseAdmin();
 
     for (const file of files) {
-      const path = buildOriginalStoragePath(projectId, file.name);
-      const bytes = await file.arrayBuffer();
+      const path = buildOriginalStoragePath(projectId, file.name.replace(/\.[^.]+$/, ".jpg"));
+      const originalBytes = await file.arrayBuffer();
+      const normalizedBytes = await normalizeImageToLandscape(originalBytes);
 
       const { error: uploadError } = await supabase.storage
         .from(ORIGINAL_BUCKET)
-        .upload(path, bytes, {
-          contentType: file.type,
+        .upload(path, normalizedBytes, {
+          contentType: "image/jpeg",
           cacheControl: "3600",
           upsert: false,
         });

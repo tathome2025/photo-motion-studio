@@ -26,14 +26,15 @@
 
 1. 建立專案
 2. 批量上傳最多約 100 張相片
-3. 顯示每張縮圖，最大視覺邊長小於 200px
-4. 為每張相片指定 prompt
-5. 批量提交 Kling 生成任務
-6. 等待頁輪詢任務狀態，完成後自動跳到剪輯頁
-7. 已完成片段自動進入 timeline
-8. 拖放重排次序
-9. 每段設定過場、邊框、主題
-10. 以瀏覽器內 `ffmpeg.wasm` 匯出 MP4
+3. 上傳時自動把相片統一成 16:9，直向相片會左右補黑邊
+4. 顯示每張縮圖，最大視覺邊長小於 200px
+5. 為每張相片指定 prompt，可選自訂動作或直接保留靜態相片
+6. 批量提交 Kling 生成任務
+7. 等待頁輪詢任務狀態，完成後自動跳到剪輯頁
+8. 已完成片段自動進入橫向 timeline
+9. 拖放重排次序、刪除片段、刪除生成結果、最多重新生成 3 次
+10. 每段設定過場、邊框、主題
+11. 以瀏覽器內 `ffmpeg.wasm` 匯出 MP4
 
 ## 專案結構
 
@@ -73,16 +74,27 @@ KLING_SECRET_KEY=
 KLING_API_BASE_URL=https://api-singapore.klingai.com
 KLING_IMAGE_TO_VIDEO_PATH=/v1/videos/image2video
 KLING_QUERY_TASK_TEMPLATE=/v1/videos/image2video/{taskId}
-KLING_MODEL_NAME=kling-v1-6
-KLING_MODE=std
+KLING_MODEL_NAME=video-2.6
+KLING_MODE=
 KLING_DURATION_SECONDS=5
 ```
 
 說明：
 
 - 我把 Kling base URL 與 query path 都做成 env，因為官方文件版本與區域 endpoint 近年有變動。
-- `kling-v1.5 / v1.6` 這類模型通常要帶 `mode`，預設可先用 `std`。
+- 預設模型已改為 `VIDEO 2.6`；若你的帳號實際 slug 不同，只需修改 `KLING_MODEL_NAME`。
+- `KLING_MODE` 預設留空；只有在你的帳號/模型明確要求時才填。
 - `src/lib/kling.ts` 已把 JWT bearer token 簽名與建立 / 查詢 task 的邏輯抽出，若你的帳號對應欄位格式不同，只需要在這個檔案微調。
+
+## 升級 schema
+
+如果你之前已經執行過一次 schema，這次請重新執行 [supabase/schema.sql](/Users/TY/photo-motion-studio/supabase/schema.sql)，因為新增了：
+
+- `custom_prompt`
+- `regeneration_count`
+- `is_static_clip`
+
+以及新的 prompt key 約束。
 
 ## Vercel 部署
 

@@ -19,7 +19,9 @@ export type PromptKey =
   | "handshake"
   | "hugging"
   | "brotherhood"
-  | "blow-a-kiss";
+  | "blow-a-kiss"
+  | "custom"
+  | "static";
 
 export type TransitionKey = "cut" | "fade" | "wipeleft" | "slideup";
 
@@ -69,8 +71,11 @@ export interface ProjectAsset {
   generatedUrl: string | null;
   promptKey: PromptKey | null;
   promptLabel: string | null;
+  customPrompt: string | null;
   generationStatus: AssetGenerationStatus;
   klingTaskId: string | null;
+  regenerationCount: number;
+  isStaticClip: boolean;
   timelineOrder: number;
   transitionKey: TransitionKey;
   themeKey: ThemeKey;
