@@ -43,9 +43,17 @@ export function CreateProjectForm({ compact = false }: CreateProjectFormProps) {
       className={compact ? "grid gap-4" : "grid gap-4 border border-[var(--line)] p-5"}
       onSubmit={handleSubmit}
     >
+      <button
+        type="submit"
+        className="inline-flex h-10 items-center justify-center self-start border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
+        disabled={isPending}
+      >
+        {isPending ? "建立中..." : "新增專案"}
+      </button>
+
       <div className="space-y-4">
         <label className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-          New project
+          New Project Name
         </label>
         <input
           required
@@ -55,14 +63,6 @@ export function CreateProjectForm({ compact = false }: CreateProjectFormProps) {
           onChange={(event) => setName(event.target.value)}
         />
       </div>
-
-      <button
-        type="submit"
-        className="inline-flex h-10 items-center justify-center self-start border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
-        disabled={isPending}
-      >
-        {isPending ? "建立中..." : "新增專案"}
-      </button>
 
       {error ? <p className="text-sm text-[#8d2f24]">{error}</p> : null}
     </form>
