@@ -17,7 +17,6 @@ export const PROMPT_OPTIONS: PromptOption[] = [
   { key: "laughing", label: "大笑 Laughing", prompt: "向相片其他人大笑後再望向鏡頭" },
   { key: "handshake", label: "握手 Handshake", prompt: "與相片中其他人握手" },
   { key: "hugging", label: "擁抱 Hugging", prompt: "與相片中其他人擁抱" },
-  { key: "brotherhood", label: "手足情誼 Brotherhood", prompt: "與相片中其他人搭膊頭" },
   { key: "blow-a-kiss", label: "飛吻 Blow a kiss", prompt: "相中人向鏡頭飛吻" },
   { key: "custom", label: "其他動作", prompt: "" },
   { key: "static", label: "不用生成動作", prompt: "" },

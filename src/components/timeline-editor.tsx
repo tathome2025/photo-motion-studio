@@ -20,16 +20,15 @@ import { fetchFile } from "@ffmpeg/util";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { GripVertical, RefreshCcw, Trash2 } from "lucide-react";
+import { GripVertical, Trash2 } from "lucide-react";
 
 import {
   FRAME_STYLE_OPTIONS,
   MAX_REGENERATION_COUNT,
-  PROMPT_OPTIONS,
   THEME_OPTIONS,
   TRANSITION_OPTIONS,
 } from "@/lib/constants";
-import type { ProjectAsset, PromptKey, TimelineUpdateItem } from "@/lib/types";
+import type { ProjectAsset, TimelineUpdateItem } from "@/lib/types";
 
 interface TimelineEditorProps {
   projectId: string;
@@ -205,27 +204,6 @@ export function TimelineEditor({
   const sensors = useSensors(useSensor(PointerSensor));
   const [assets, setAssets] = useState(initialAssets);
   const [selectedAssetId, setSelectedAssetId] = useState(initialAssets[0]?.id ?? null);
-  const [regeneratePlan, setRegeneratePlan] = useState<
-    Record<
-      string,
-      {
-        checked: boolean;
-        promptKey: PromptKey;
-        customPrompt: string;
-      }
-    >
-  >(() =>
-    Object.fromEntries(
-      initialAssets.map((asset) => [
-        asset.id,
-        {
-          checked: false,
-          promptKey: asset.promptKey ?? "smile",
-          customPrompt: asset.customPrompt ?? "",
-        },
-      ]),
-    ),
-  );
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -246,33 +224,7 @@ export function TimelineEditor({
   const selectedAsset =
     assets.find((asset) => asset.id === selectedAssetId) ?? assets[0] ?? null;
 
-  useEffect(() => {
-    setRegeneratePlan((current) => {
-      const next: typeof current = {};
-
-      for (const asset of assets) {
-        next[asset.id] = current[asset.id] ?? {
-          checked: false,
-          promptKey: asset.promptKey ?? "smile",
-          customPrompt: asset.customPrompt ?? "",
-        };
-      }
-
-      return next;
-    });
-  }, [assets]);
-
   const orderedIds = useMemo(() => assets.map((asset) => asset.id), [assets]);
-  const checkedAssetIds = assets
-    .filter((asset) => regeneratePlan[asset.id]?.checked)
-    .map((asset) => asset.id);
-  const selectedRegenerateSettings = selectedAsset
-    ? regeneratePlan[selectedAsset.id] ?? {
-        checked: false,
-        promptKey: selectedAsset.promptKey ?? "smile",
-        customPrompt: selectedAsset.customPrompt ?? "",
-      }
-    : null;
 
   function persistTimeline(nextAssets: ProjectAsset[], successMessage = "時間線已儲存。") {
     setError(null);
@@ -340,25 +292,6 @@ export function TimelineEditor({
     );
   }
 
-  function handleRegenerateSettingChange(
-    assetId: string,
-    updates: Partial<{
-      checked: boolean;
-      promptKey: PromptKey;
-      customPrompt: string;
-    }>,
-  ) {
-    setRegeneratePlan((current) => ({
-      ...current,
-      [assetId]: {
-        checked: current[assetId]?.checked ?? false,
-        promptKey: current[assetId]?.promptKey ?? "smile",
-        customPrompt: current[assetId]?.customPrompt ?? "",
-        ...updates,
-      },
-    }));
-  }
-
   function saveTimelineEdits() {
     persistTimeline(assets);
   }
@@ -387,67 +320,6 @@ export function TimelineEditor({
 
     setAssets((current) => current.filter((asset) => asset.id !== selectedAsset.id));
     setStatusMessage("片段已刪除。");
-  }
-
-  async function regenerateSelected() {
-    if (checkedAssetIds.length === 0) {
-      setError("請先勾選要重新生成的片段。");
-      return;
-    }
-
-    setError(null);
-    setStatusMessage(null);
-
-    const failures: string[] = [];
-    let successCount = 0;
-
-    for (const assetId of checkedAssetIds) {
-      const settings = regeneratePlan[assetId];
-      const asset = assets.find((item) => item.id === assetId);
-
-      if (!settings || !asset) {
-        continue;
-      }
-
-      if (settings.promptKey === "custom" && !settings.customPrompt.trim()) {
-        failures.push(`${asset.fileName}: 選擇「其他動作」時請輸入 prompt。`);
-        continue;
-      }
-
-      const response = await fetch(
-        `/api/projects/${projectId}/assets/${assetId}/regenerate`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            promptKey: settings.promptKey,
-            customPrompt: settings.customPrompt,
-          }),
-        },
-      );
-
-      const data = await parseApiResponse(response);
-
-      if (!response.ok) {
-        failures.push(data.error ? `${asset.fileName}: ${data.error}` : `${asset.fileName}: 重新生成失敗。`);
-        continue;
-      }
-
-      successCount += 1;
-    }
-
-    if (successCount === 0) {
-      setError(failures[0] ?? "重新生成失敗。");
-      return;
-    }
-
-    if (failures.length > 0) {
-      setStatusMessage(`已提交 ${successCount} 個片段，另有 ${failures.length} 個未能提交。`);
-    }
-
-    window.location.href = `/projects/${projectId}/waiting`;
   }
 
   async function exportVideo() {
@@ -692,91 +564,21 @@ export function TimelineEditor({
                 <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
                   Regenerate
                 </p>
-                <h4 className="text-lg tracking-tight">勾選後統一重新生成</h4>
+                <h4 className="text-lg tracking-tight">前往獨立頁面重新生成</h4>
               </div>
               <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
                 max {MAX_REGENERATION_COUNT}
               </div>
             </div>
             <p className="text-sm leading-6 text-[var(--muted)]">
-              在這個區塊勾選要重新生成的片段，再以目前選取片段設定動作。
-              已勾選 {checkedAssetIds.length} 項。
+              重新生成會打開獨立頁面，一次過顯示所有縮圖，再逐張勾選並設定生成動作。
             </p>
-            <div className="grid max-h-48 gap-2 overflow-y-auto border border-[var(--line)] p-3">
-              {assets.map((asset) => (
-                <div
-                  key={asset.id}
-                  className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.16em] text-[var(--muted)]"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="h-3.5 w-3.5"
-                      checked={Boolean(regeneratePlan[asset.id]?.checked)}
-                      onChange={(event) =>
-                        handleRegenerateSettingChange(asset.id, {
-                          checked: event.target.checked,
-                        })
-                      }
-                      disabled={asset.regenerationCount >= MAX_REGENERATION_COUNT}
-                    />
-                    <button
-                      type="button"
-                      className={`truncate text-left transition ${
-                        selectedAsset.id === asset.id ? "text-[var(--text)]" : ""
-                      }`}
-                      onClick={() => setSelectedAssetId(asset.id)}
-                    >
-                      {asset.fileName}
-                    </button>
-                  </span>
-                  <span>{asset.regenerationCount}/{MAX_REGENERATION_COUNT}</span>
-                </div>
-              ))}
-            </div>
-            <select
-              className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm outline-none focus:border-[var(--text)]"
-              value={selectedRegenerateSettings?.promptKey ?? "smile"}
-              onChange={(event) =>
-                handleRegenerateSettingChange(selectedAsset.id, {
-                  promptKey: event.target.value as PromptKey,
-                })
-              }
-              disabled={selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT}
+            <Link
+              href={`/projects/${projectId}/regenerate`}
+              className="inline-flex h-10 items-center justify-center border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
             >
-              {PROMPT_OPTIONS.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            {selectedRegenerateSettings?.promptKey === "custom" ? (
-              <textarea
-                className="min-h-24 border border-[var(--line)] bg-transparent px-3 py-3 text-sm outline-none focus:border-[var(--text)]"
-                placeholder="輸入自訂動作 prompt"
-                value={selectedRegenerateSettings.customPrompt}
-                onChange={(event) =>
-                  handleRegenerateSettingChange(selectedAsset.id, {
-                    customPrompt: event.target.value,
-                  })
-                }
-                disabled={selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT}
-              />
-            ) : null}
-            <button
-              type="button"
-              className="inline-flex h-11 items-center justify-center gap-2 border border-[var(--text)] px-4 text-sm uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)] disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:text-[var(--muted)]"
-              onClick={regenerateSelected}
-              disabled={
-                selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT ||
-                checkedAssetIds.length === 0
-              }
-            >
-              <RefreshCcw size={15} />
-              {selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT
-                ? "已達上限，請刪除相片再重新上傳生成"
-                : "重新生成所有已勾選項目"}
-            </button>
+              打開重新生成頁面
+            </Link>
           </div>
 
           <div className="grid gap-3">
@@ -800,9 +602,7 @@ export function TimelineEditor({
             </p>
             <h3 className="text-2xl tracking-tight">拖動縮圖重新排序</h3>
           </div>
-          <div className="text-sm text-[var(--muted)]">
-            {assets.length} clips / {checkedAssetIds.length} checked
-          </div>
+          <div className="text-sm text-[var(--muted)]">{assets.length} clips</div>
         </div>
 
         <div className="overflow-x-auto">

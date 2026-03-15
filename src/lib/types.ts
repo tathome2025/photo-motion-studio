@@ -18,7 +18,6 @@ export type PromptKey =
   | "laughing"
   | "handshake"
   | "hugging"
-  | "brotherhood"
   | "blow-a-kiss"
   | "custom"
   | "static";

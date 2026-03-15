@@ -43,28 +43,26 @@ export function CreateProjectForm({ compact = false }: CreateProjectFormProps) {
       className={compact ? "grid gap-4" : "grid gap-4 border border-[var(--line)] p-5"}
       onSubmit={handleSubmit}
     >
-      <div className="space-y-2">
+      <div className="space-y-4">
         <label className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
           New project
         </label>
-        <div className="grid gap-0">
-          <input
-            required
-            className="h-12 border border-[var(--line)] bg-transparent px-4 text-sm outline-none transition focus:border-[var(--text)]"
-            placeholder="例如：Family Portrait Cut"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-
-          <button
-            type="submit"
-            className="h-12 border border-t-0 border-[var(--text)] px-4 text-sm uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={isPending}
-          >
-            {isPending ? "建立中..." : "新增專案"}
-          </button>
-        </div>
+        <input
+          required
+          className="h-12 border border-[var(--line)] bg-transparent px-4 text-sm outline-none transition focus:border-[var(--text)]"
+          placeholder="例如：Family Portrait Cut"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
       </div>
+
+      <button
+        type="submit"
+        className="inline-flex h-10 items-center justify-center self-start border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
+        disabled={isPending}
+      >
+        {isPending ? "建立中..." : "新增專案"}
+      </button>
 
       {error ? <p className="text-sm text-[#8d2f24]">{error}</p> : null}
     </form>

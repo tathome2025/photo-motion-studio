@@ -21,7 +21,6 @@ const selectionSchema = z.object({
     "laughing",
     "handshake",
     "hugging",
-    "brotherhood",
     "blow-a-kiss",
     "custom",
     "static",
