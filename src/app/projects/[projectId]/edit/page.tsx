@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { DeleteProjectButton } from "@/components/delete-project-button";
+import { EditUploadPanel } from "@/components/edit-upload-panel";
 import { TimelineEditor } from "@/components/timeline-editor";
 import { getProjectDetails } from "@/lib/data";
 
@@ -44,6 +45,11 @@ export default async function EditPage({ params }: EditPageProps) {
           <DeleteProjectButton projectId={projectId} />
         </div>
       </section>
+
+      <EditUploadPanel
+        projectId={projectId}
+        currentAssetCount={project.assetCount}
+      />
 
       <TimelineEditor projectId={projectId} initialAssets={project.assets} />
     </main>

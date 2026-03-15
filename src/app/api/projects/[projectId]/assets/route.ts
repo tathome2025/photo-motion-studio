@@ -6,6 +6,7 @@ import {
   buildOriginalStoragePath,
   getProjectDetails,
   insertUploadedAsset,
+  markProjectStatus,
 } from "@/lib/data";
 import { normalizeImageToLandscape } from "@/lib/image";
 import { assertSupabaseAdmin } from "@/lib/supabase";
@@ -65,6 +66,13 @@ export async function POST(
         fileName: file.name,
         originalUrl: data.publicUrl,
       });
+    }
+
+    if (
+      currentProject &&
+      ["ready", "rendered", "rendering"].includes(currentProject.status)
+    ) {
+      await markProjectStatus(projectId, "draft");
     }
 
     const project = await getProjectDetails(projectId);

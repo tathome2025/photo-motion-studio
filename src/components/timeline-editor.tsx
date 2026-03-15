@@ -120,10 +120,14 @@ function SortableTimelineClip({
   asset,
   isSelected,
   onSelect,
+  checkedForRegeneration,
+  onCheckedChange,
 }: {
   asset: ProjectAsset;
   isSelected: boolean;
   onSelect: (assetId: string) => void;
+  checkedForRegeneration: boolean;
+  onCheckedChange: (assetId: string, checked: boolean) => void;
 }) {
   const {
     attributes,
@@ -173,9 +177,16 @@ function SortableTimelineClip({
       </button>
 
       <div className="flex items-center justify-between gap-3">
-        <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">
+        <label className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">
+          <input
+            type="checkbox"
+            className="h-3.5 w-3.5"
+            checked={checkedForRegeneration}
+            onChange={(event) => onCheckedChange(asset.id, event.target.checked)}
+            disabled={asset.regenerationCount >= MAX_REGENERATION_COUNT}
+          />
           {asset.regenerationCount}/{MAX_REGENERATION_COUNT} re-gen
-        </div>
+        </label>
         <button
           type="button"
           className="grid h-9 w-9 place-items-center border border-[var(--line)]"
@@ -207,8 +218,27 @@ export function TimelineEditor({
   const sensors = useSensors(useSensor(PointerSensor));
   const [assets, setAssets] = useState(initialAssets);
   const [selectedAssetId, setSelectedAssetId] = useState(initialAssets[0]?.id ?? null);
-  const [regeneratePromptKey, setRegeneratePromptKey] = useState<PromptKey>("smile");
-  const [regenerateCustomPrompt, setRegenerateCustomPrompt] = useState("");
+  const [regeneratePlan, setRegeneratePlan] = useState<
+    Record<
+      string,
+      {
+        checked: boolean;
+        promptKey: PromptKey;
+        customPrompt: string;
+      }
+    >
+  >(() =>
+    Object.fromEntries(
+      initialAssets.map((asset) => [
+        asset.id,
+        {
+          checked: false,
+          promptKey: asset.promptKey ?? "smile",
+          customPrompt: asset.customPrompt ?? "",
+        },
+      ]),
+    ),
+  );
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -230,15 +260,32 @@ export function TimelineEditor({
     assets.find((asset) => asset.id === selectedAssetId) ?? assets[0] ?? null;
 
   useEffect(() => {
-    if (!selectedAsset) {
-      return;
-    }
+    setRegeneratePlan((current) => {
+      const next: typeof current = {};
 
-    setRegeneratePromptKey(selectedAsset.promptKey ?? "smile");
-    setRegenerateCustomPrompt(selectedAsset.customPrompt ?? "");
-  }, [selectedAsset]);
+      for (const asset of assets) {
+        next[asset.id] = current[asset.id] ?? {
+          checked: false,
+          promptKey: asset.promptKey ?? "smile",
+          customPrompt: asset.customPrompt ?? "",
+        };
+      }
+
+      return next;
+    });
+  }, [assets]);
 
   const orderedIds = useMemo(() => assets.map((asset) => asset.id), [assets]);
+  const checkedAssetIds = assets
+    .filter((asset) => regeneratePlan[asset.id]?.checked)
+    .map((asset) => asset.id);
+  const selectedRegenerateSettings = selectedAsset
+    ? regeneratePlan[selectedAsset.id] ?? {
+        checked: false,
+        promptKey: selectedAsset.promptKey ?? "smile",
+        customPrompt: selectedAsset.customPrompt ?? "",
+      }
+    : null;
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -270,6 +317,25 @@ export function TimelineEditor({
           : asset,
       ),
     );
+  }
+
+  function handleRegenerateSettingChange(
+    assetId: string,
+    updates: Partial<{
+      checked: boolean;
+      promptKey: PromptKey;
+      customPrompt: string;
+    }>,
+  ) {
+    setRegeneratePlan((current) => ({
+      ...current,
+      [assetId]: {
+        checked: current[assetId]?.checked ?? false,
+        promptKey: current[assetId]?.promptKey ?? "smile",
+        customPrompt: current[assetId]?.customPrompt ?? "",
+        ...updates,
+      },
+    }));
   }
 
   function saveTimelineEdits() {
@@ -331,37 +397,61 @@ export function TimelineEditor({
   }
 
   async function regenerateSelected() {
-    if (!selectedAsset) {
-      return;
-    }
-
-    if (
-      regeneratePromptKey === "custom" &&
-      !regenerateCustomPrompt.trim()
-    ) {
-      setError("選擇「其他動作」時請輸入 prompt。");
+    if (checkedAssetIds.length === 0) {
+      setError("請先勾選要重新生成的片段。");
       return;
     }
 
     setError(null);
-    const response = await fetch(
-      `/api/projects/${projectId}/assets/${selectedAsset.id}/regenerate`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          promptKey: regeneratePromptKey,
-          customPrompt: regenerateCustomPrompt,
-        }),
-      },
-    );
-    const data = await parseApiResponse(response);
+    setStatusMessage(null);
 
-    if (!response.ok) {
-      setError(data.error ?? "重新生成失敗。");
+    const failures: string[] = [];
+    let successCount = 0;
+
+    for (const assetId of checkedAssetIds) {
+      const settings = regeneratePlan[assetId];
+      const asset = assets.find((item) => item.id === assetId);
+
+      if (!settings || !asset) {
+        continue;
+      }
+
+      if (settings.promptKey === "custom" && !settings.customPrompt.trim()) {
+        failures.push(`${asset.fileName}: 選擇「其他動作」時請輸入 prompt。`);
+        continue;
+      }
+
+      const response = await fetch(
+        `/api/projects/${projectId}/assets/${assetId}/regenerate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            promptKey: settings.promptKey,
+            customPrompt: settings.customPrompt,
+          }),
+        },
+      );
+
+      const data = await parseApiResponse(response);
+
+      if (!response.ok) {
+        failures.push(data.error ? `${asset.fileName}: ${data.error}` : `${asset.fileName}: 重新生成失敗。`);
+        continue;
+      }
+
+      successCount += 1;
+    }
+
+    if (successCount === 0) {
+      setError(failures[0] ?? "重新生成失敗。");
       return;
+    }
+
+    if (failures.length > 0) {
+      setStatusMessage(`已提交 ${successCount} 個片段，另有 ${failures.length} 個未能提交。`);
     }
 
     window.location.href = `/projects/${projectId}/waiting`;
@@ -609,16 +699,24 @@ export function TimelineEditor({
                 <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
                   Regenerate
                 </p>
-                <h4 className="text-lg tracking-tight">重新選擇動作</h4>
+                <h4 className="text-lg tracking-tight">勾選後統一重新生成</h4>
               </div>
               <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
                 max {MAX_REGENERATION_COUNT}
               </div>
             </div>
+            <p className="text-sm leading-6 text-[var(--muted)]">
+              先在時間線勾選要重新生成的片段，再以目前選取片段設定動作。
+              已勾選 {checkedAssetIds.length} 項。
+            </p>
             <select
               className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm outline-none focus:border-[var(--text)]"
-              value={regeneratePromptKey}
-              onChange={(event) => setRegeneratePromptKey(event.target.value as PromptKey)}
+              value={selectedRegenerateSettings?.promptKey ?? "smile"}
+              onChange={(event) =>
+                handleRegenerateSettingChange(selectedAsset.id, {
+                  promptKey: event.target.value as PromptKey,
+                })
+              }
               disabled={selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT}
             >
               {PROMPT_OPTIONS.map((option) => (
@@ -627,12 +725,16 @@ export function TimelineEditor({
                 </option>
               ))}
             </select>
-            {regeneratePromptKey === "custom" ? (
+            {selectedRegenerateSettings?.promptKey === "custom" ? (
               <textarea
                 className="min-h-24 border border-[var(--line)] bg-transparent px-3 py-3 text-sm outline-none focus:border-[var(--text)]"
                 placeholder="輸入自訂動作 prompt"
-                value={regenerateCustomPrompt}
-                onChange={(event) => setRegenerateCustomPrompt(event.target.value)}
+                value={selectedRegenerateSettings.customPrompt}
+                onChange={(event) =>
+                  handleRegenerateSettingChange(selectedAsset.id, {
+                    customPrompt: event.target.value,
+                  })
+                }
                 disabled={selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT}
               />
             ) : null}
@@ -640,12 +742,15 @@ export function TimelineEditor({
               type="button"
               className="inline-flex h-11 items-center justify-center gap-2 border border-[var(--text)] px-4 text-sm uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)] disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:text-[var(--muted)]"
               onClick={regenerateSelected}
-              disabled={selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT}
+              disabled={
+                selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT ||
+                checkedAssetIds.length === 0
+              }
             >
               <RefreshCcw size={15} />
               {selectedAsset.regenerationCount >= MAX_REGENERATION_COUNT
                 ? "已達上限，請刪除相片"
-                : "重新生成"}
+                : "重新生成所有已勾選項目"}
             </button>
           </div>
 
@@ -670,7 +775,9 @@ export function TimelineEditor({
             </p>
             <h3 className="text-2xl tracking-tight">拖動縮圖重新排序</h3>
           </div>
-          <div className="text-sm text-[var(--muted)]">{assets.length} clips</div>
+          <div className="text-sm text-[var(--muted)]">
+            {assets.length} clips / {checkedAssetIds.length} checked
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -687,6 +794,10 @@ export function TimelineEditor({
                     asset={asset}
                     isSelected={asset.id === selectedAsset.id}
                     onSelect={setSelectedAssetId}
+                    checkedForRegeneration={Boolean(regeneratePlan[asset.id]?.checked)}
+                    onCheckedChange={(assetId, checked) =>
+                      handleRegenerateSettingChange(assetId, { checked })
+                    }
                   />
                 ))}
               </div>
