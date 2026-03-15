@@ -31,18 +31,6 @@ export default async function HomePage() {
   return (
     <main className="mx-auto grid min-h-screen w-full max-w-7xl gap-10 px-6 py-8 md:px-10">
       <ProjectStatusPoller projectIds={generatingProjectIds} />
-      <section className="grid gap-4 border border-[var(--line-strong)] p-6">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-              New project
-            </p>
-            <h2 className="text-2xl tracking-tight">新增專案</h2>
-          </div>
-        </div>
-        <CreateProjectForm compact />
-      </section>
-
       <section className="grid gap-6 border border-[var(--line-strong)] p-6 md:grid-cols-[1.1fr_0.9fr] md:items-end">
         <div className="space-y-5">
           <p className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]">
@@ -82,7 +70,9 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-6">
+      <section className="grid gap-6 lg:grid-cols-[340px_1fr]">
+        <CreateProjectForm />
+
         <div className="grid gap-4">
           <div className="flex items-end justify-between">
             <div>

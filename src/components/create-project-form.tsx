@@ -44,22 +44,26 @@ export function CreateProjectForm({ compact = false }: CreateProjectFormProps) {
       onSubmit={handleSubmit}
     >
       <div className="space-y-2">
-        <input
-          required
-          className="h-12 border border-[var(--line)] bg-transparent px-4 text-sm outline-none transition focus:border-[var(--text)]"
-          placeholder="例如：Family Portrait Cut"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
+        <label className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
+          New project
+        </label>
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <input
+            required
+            className="h-12 border border-[var(--line)] bg-transparent px-4 text-sm outline-none transition focus:border-[var(--text)]"
+            placeholder="例如：Family Portrait Cut"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+          <button
+            type="submit"
+            className="h-12 border border-[var(--text)] px-4 text-sm uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={isPending}
+          >
+            {isPending ? "建立中..." : "新增專案"}
+          </button>
+        </div>
       </div>
-
-      <button
-        type="submit"
-        className="h-12 border border-[var(--text)] px-4 text-sm uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-40"
-        disabled={isPending}
-      >
-        {isPending ? "建立中..." : "新增專案"}
-      </button>
 
       {error ? <p className="text-sm text-[#8d2f24]">{error}</p> : null}
     </form>
