@@ -40,7 +40,7 @@ export function CreateProjectForm({ compact = false }: CreateProjectFormProps) {
 
   return (
     <form
-      className={compact ? "grid gap-4" : "grid gap-4 border border-[var(--line)] p-5"}
+      className={compact ? "grid gap-2" : "grid gap-2 border border-[var(--line)] p-5"}
       onSubmit={handleSubmit}
     >
       <button
@@ -51,7 +51,7 @@ export function CreateProjectForm({ compact = false }: CreateProjectFormProps) {
         {isPending ? "建立中..." : "新增專案"}
       </button>
 
-      <div className="space-y-4">
+      <div className="space-y-2">
         <label className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
           New Project Name
         </label>
