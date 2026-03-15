@@ -74,7 +74,7 @@ KLING_SECRET_KEY=
 KLING_API_BASE_URL=https://api-singapore.klingai.com
 KLING_IMAGE_TO_VIDEO_PATH=/v1/videos/image2video
 KLING_QUERY_TASK_TEMPLATE=/v1/videos/image2video/{taskId}
-KLING_MODEL_NAME=video-2.6
+KLING_MODEL_NAME=
 KLING_MODE=
 KLING_DURATION_SECONDS=5
 ```
@@ -82,7 +82,7 @@ KLING_DURATION_SECONDS=5
 說明：
 
 - 我把 Kling base URL 與 query path 都做成 env，因為官方文件版本與區域 endpoint 近年有變動。
-- 預設模型已改為 `VIDEO 2.6`；若你的帳號實際 slug 不同，只需修改 `KLING_MODEL_NAME`。
+- `VIDEO 2.6` 看來是產品名稱，不一定等於 API 的 `model_name` slug。若你未能在 Kling developer console 找到精確 slug，先把 `KLING_MODEL_NAME` 留空，讓 API 使用帳戶預設模型。
 - `KLING_MODE` 預設留空；只有在你的帳號/模型明確要求時才填。
 - `src/lib/kling.ts` 已把 JWT bearer token 簽名與建立 / 查詢 task 的邏輯抽出，若你的帳號對應欄位格式不同，只需要在這個檔案微調。
 

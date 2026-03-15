@@ -120,15 +120,18 @@ export async function createKlingImageToVideoTask({
   callbackUrl,
 }: CreateKlingTaskInput) {
   const duration = Number(process.env.KLING_DURATION_SECONDS ?? DEFAULT_CLIP_DURATION);
-  const modelName = process.env.KLING_MODEL_NAME ?? "video-2.6";
+  const modelName = process.env.KLING_MODEL_NAME?.trim();
   const configuredMode = process.env.KLING_MODE;
 
   const payload: Record<string, unknown> = {
     image: imageUrl,
     prompt,
-    model_name: modelName,
     duration,
   };
+
+  if (modelName) {
+    payload.model_name = modelName;
+  }
 
   if (callbackUrl && !callbackUrl.includes("localhost")) {
     payload.callback_url = callbackUrl;
@@ -136,7 +139,7 @@ export async function createKlingImageToVideoTask({
 
   if (configuredMode) {
     payload.mode = configuredMode;
-  } else if (shouldSendMode(modelName)) {
+  } else if (modelName && shouldSendMode(modelName)) {
     payload.mode = "std";
   }
 
