@@ -23,15 +23,15 @@ function getProjectLink(projectId: string, status: string) {
 
 function getProjectCardBorderColor(status: string) {
   if (status === "draft") {
-    return "#FFFFC5";
+    return "#d47b00";
   }
 
   if (status === "ready") {
-    return "#cff0af";
+    return "#187301";
   }
 
   if (status === "generating") {
-    return "#f0b5af";
+    return "#8a011a";
   }
 
   return null;
