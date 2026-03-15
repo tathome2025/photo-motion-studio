@@ -8,6 +8,24 @@ interface CreateKlingTaskInput {
   callbackUrl?: string;
 }
 
+type KlingPayload = Record<string, unknown> & {
+  data?: Record<string, unknown> & {
+    task_result?: Record<string, unknown> & {
+      videos?: Array<Record<string, unknown>>;
+    };
+  };
+};
+
+function shouldSendMode(modelName: string) {
+  const normalized = modelName.toLowerCase();
+
+  if (normalized.startsWith("kling-v2") && !normalized.startsWith("kling-v2-1")) {
+    return false;
+  }
+
+  return true;
+}
+
 function base64Url(input: Buffer | string) {
   return Buffer.from(input)
     .toString("base64")
@@ -64,21 +82,32 @@ async function klingFetch(path: string, init: RequestInit) {
   const response = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     headers: {
+      Accept: "application/json",
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       ...(init.headers ?? {}),
     },
   });
 
-  const data = await response.json().catch(() => null);
+  const rawText = await response.text();
+  let parsedData: unknown = null;
+  try {
+    parsedData = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    parsedData = rawText || null;
+  }
 
   if (!response.ok) {
     throw new Error(
-      `Kling API 錯誤 ${response.status}: ${JSON.stringify(data ?? {})}`,
+      `Kling API 錯誤 ${response.status}: ${
+        typeof parsedData === "string"
+          ? parsedData
+          : JSON.stringify(parsedData ?? {})
+      }`,
     );
   }
 
-  return data;
+  return parsedData;
 }
 
 export async function createKlingImageToVideoTask({
@@ -88,19 +117,29 @@ export async function createKlingImageToVideoTask({
 }: CreateKlingTaskInput) {
   const duration = Number(process.env.KLING_DURATION_SECONDS ?? DEFAULT_CLIP_DURATION);
   const modelName = process.env.KLING_MODEL_NAME ?? "kling-v1-6";
+  const configuredMode = process.env.KLING_MODE;
 
-  const payload = {
-    image_url: imageUrl,
+  const payload: Record<string, unknown> = {
+    image: imageUrl,
     prompt,
     model_name: modelName,
     duration,
-    callback_url: callbackUrl,
   };
+
+  if (callbackUrl && !callbackUrl.includes("localhost")) {
+    payload.callback_url = callbackUrl;
+  }
+
+  if (configuredMode) {
+    payload.mode = configuredMode;
+  } else if (shouldSendMode(modelName)) {
+    payload.mode = "std";
+  }
 
   const data = await klingFetch(getCreatePath(), {
     method: "POST",
     body: JSON.stringify(payload),
-  });
+  }) as KlingPayload;
 
   const taskId =
     data?.data?.task_id ??
@@ -121,7 +160,7 @@ export async function createKlingImageToVideoTask({
 export async function queryKlingTask(taskId: string) {
   const data = await klingFetch(getQueryPath(taskId), {
     method: "GET",
-  });
+  }) as KlingPayload;
 
   const status =
     data?.data?.task_status ??

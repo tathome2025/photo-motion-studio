@@ -74,12 +74,14 @@ KLING_API_BASE_URL=https://api-singapore.klingai.com
 KLING_IMAGE_TO_VIDEO_PATH=/v1/videos/image2video
 KLING_QUERY_TASK_TEMPLATE=/v1/videos/image2video/{taskId}
 KLING_MODEL_NAME=kling-v1-6
+KLING_MODE=std
 KLING_DURATION_SECONDS=5
 ```
 
 說明：
 
 - 我把 Kling base URL 與 query path 都做成 env，因為官方文件版本與區域 endpoint 近年有變動。
+- `kling-v1.5 / v1.6` 這類模型通常要帶 `mode`，預設可先用 `std`。
 - `src/lib/kling.ts` 已把 JWT bearer token 簽名與建立 / 查詢 task 的邏輯抽出，若你的帳號對應欄位格式不同，只需要在這個檔案微調。
 
 ## Vercel 部署

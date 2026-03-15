@@ -65,6 +65,7 @@ export async function POST(
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
     let queuedCount = 0;
+    const failedMessages: string[] = [];
 
     for (const asset of project.assets) {
       const selection = payload.selections.find((item) => item.id === asset.id);
@@ -88,15 +89,21 @@ export async function POST(
 
         queuedCount += 1;
       } catch (reason) {
+        const message =
+          reason instanceof Error ? reason.message : "提交 Kling 任務失敗。";
+
         await markAssetFailed(
           asset.id,
-          reason instanceof Error ? reason.message : "提交 Kling 任務失敗。",
+          message,
         );
+        failedMessages.push(`${asset.fileName}: ${message}`);
       }
     }
 
     if (queuedCount === 0) {
-      throw new Error("沒有任何相片成功提交到 Kling。請檢查 API 設定。");
+      throw new Error(
+        `沒有任何相片成功提交到 Kling。${failedMessages[0] ?? "請檢查 API 設定。"}`,
+      );
     }
 
     revalidatePath("/");
