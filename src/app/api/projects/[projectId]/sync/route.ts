@@ -17,12 +17,13 @@ function normalizeTaskStatus(status: string) {
     value.includes("succeed") ||
     value.includes("completed") ||
     value.includes("done") ||
-    value.includes("success")
+    value.includes("success") ||
+    value.includes("finish")
   ) {
     return "completed";
   }
 
-  if (value.includes("fail") || value.includes("error")) {
+  if (value.includes("fail") || value.includes("error") || value.includes("cancel")) {
     return "failed";
   }
 

@@ -1,5 +1,3 @@
-import crypto from "node:crypto";
-
 import { DEFAULT_CLIP_DURATION } from "@/lib/constants";
 
 interface CreateKlingTaskInput {
@@ -8,86 +6,41 @@ interface CreateKlingTaskInput {
   callbackUrl?: string;
 }
 
-type KlingPayload = Record<string, unknown> & {
-  data?: Record<string, unknown> & {
-    task_result?: Record<string, unknown> & {
-      videos?: Array<Record<string, unknown>>;
-    };
-  };
+type KiePayload = Record<string, unknown> & {
+  code?: number;
+  msg?: string;
+  data?: Record<string, unknown>;
 };
 
-function shouldSendMode(modelName: string) {
-  const normalized = modelName.toLowerCase();
+function getKieApiKey() {
+  const apiKey = process.env.KIE_API_KEY?.trim();
 
-  if (
-    normalized.startsWith("kling-v2") ||
-    normalized.startsWith("video-2.6") ||
-    normalized.startsWith("video2.6")
-  ) {
-    return false;
+  if (!apiKey) {
+    throw new Error("KIE AI API env 未設定。請先提供 KIE_API_KEY。");
   }
 
-  return true;
-}
-
-function base64Url(input: Buffer | string) {
-  return Buffer.from(input)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-function signKlingToken() {
-  const accessKey = process.env.KLING_ACCESS_KEY;
-  const secretKey = process.env.KLING_SECRET_KEY;
-
-  if (!accessKey || !secretKey) {
-    throw new Error("Kling API env 未設定。請先提供 KLING_ACCESS_KEY 與 KLING_SECRET_KEY。");
-  }
-
-  const header = { alg: "HS256", typ: "JWT" };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    iss: accessKey,
-    exp: now + 30 * 60,
-    nbf: now - 5,
-  };
-
-  const headerEncoded = base64Url(JSON.stringify(header));
-  const payloadEncoded = base64Url(JSON.stringify(payload));
-  const content = `${headerEncoded}.${payloadEncoded}`;
-  const signature = crypto
-    .createHmac("sha256", secretKey)
-    .update(content)
-    .digest();
-
-  return `${content}.${base64Url(signature)}`;
+  return apiKey;
 }
 
 function getBaseUrl() {
-  return process.env.KLING_API_BASE_URL ?? "https://api-singapore.klingai.com";
+  return process.env.KIE_API_BASE_URL ?? "https://api.kie.ai/api/v1";
 }
 
 function getCreatePath() {
-  return process.env.KLING_IMAGE_TO_VIDEO_PATH ?? "/v1/videos/image2video";
+  return process.env.KIE_CREATE_TASK_PATH ?? "/jobs/createTask";
 }
 
 function getQueryPath(taskId: string) {
-  if (process.env.KLING_QUERY_TASK_TEMPLATE) {
-    return process.env.KLING_QUERY_TASK_TEMPLATE.replace("{taskId}", taskId);
-  }
-
-  return `${getCreatePath()}/${taskId}`;
+  const template = process.env.KIE_QUERY_TASK_TEMPLATE ?? "/jobs/recordInfo?taskId={taskId}";
+  return template.replace("{taskId}", encodeURIComponent(taskId));
 }
 
-async function klingFetch(path: string, init: RequestInit) {
-  const token = signKlingToken();
+async function kieFetch(path: string, init: RequestInit) {
   const response = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${getKieApiKey()}`,
       "Content-Type": "application/json",
       ...(init.headers ?? {}),
     },
@@ -95,6 +48,7 @@ async function klingFetch(path: string, init: RequestInit) {
 
   const rawText = await response.text();
   let parsedData: unknown = null;
+
   try {
     parsedData = rawText ? JSON.parse(rawText) : null;
   } catch {
@@ -103,7 +57,7 @@ async function klingFetch(path: string, init: RequestInit) {
 
   if (!response.ok) {
     throw new Error(
-      `Kling API 錯誤 ${response.status}: ${
+      `KIE AI API 錯誤 ${response.status}: ${
         typeof parsedData === "string"
           ? parsedData
           : JSON.stringify(parsedData ?? {})
@@ -114,48 +68,82 @@ async function klingFetch(path: string, init: RequestInit) {
   return parsedData;
 }
 
+function parseResultJson(input: unknown) {
+  if (typeof input !== "string") {
+    return null;
+  }
+
+  try {
+    return JSON.parse(input) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function extractVideoUrl(payload: KiePayload) {
+  const data = payload.data ?? {};
+  const resultJson =
+    parseResultJson(data.resultJson) ??
+    parseResultJson(data.response) ??
+    parseResultJson(payload.resultJson);
+
+  const resultUrls =
+    (data.resultUrls as unknown[]) ??
+    (resultJson?.resultUrls as unknown[]) ??
+    (resultJson?.videos as unknown[]) ??
+    null;
+
+  const directUrl =
+    (Array.isArray(resultUrls) ? resultUrls[0] : null) ??
+    (data.videoUrl as string | undefined) ??
+    (resultJson?.videoUrl as string | undefined) ??
+    (resultJson?.url as string | undefined) ??
+    null;
+
+  if (typeof directUrl === "string") {
+    return directUrl;
+  }
+
+  if (directUrl && typeof directUrl === "object" && "url" in directUrl) {
+    const candidate = (directUrl as { url?: string }).url;
+    return typeof candidate === "string" ? candidate : null;
+  }
+
+  return null;
+}
+
 export async function createKlingImageToVideoTask({
   imageUrl,
   prompt,
   callbackUrl,
 }: CreateKlingTaskInput) {
   const duration = Number(process.env.KLING_DURATION_SECONDS ?? DEFAULT_CLIP_DURATION);
-  const modelName = process.env.KLING_MODEL_NAME?.trim();
-  const configuredMode = process.env.KLING_MODE;
-
   const payload: Record<string, unknown> = {
-    image: imageUrl,
-    prompt,
-    duration,
+    model: process.env.KIE_MODEL_NAME?.trim() || "kling-video-v3",
+    callBackUrl:
+      callbackUrl && !callbackUrl.includes("localhost") ? callbackUrl : undefined,
+    input: {
+      prompt,
+      image_urls: [imageUrl],
+      duration: String(duration),
+      aspect_ratio: "16:9",
+      mode: process.env.KIE_KLING_MODE?.trim() || "std",
+    },
   };
 
-  if (modelName) {
-    payload.model_name = modelName;
-  }
-
-  if (callbackUrl && !callbackUrl.includes("localhost")) {
-    payload.callback_url = callbackUrl;
-  }
-
-  if (configuredMode) {
-    payload.mode = configuredMode;
-  } else if (modelName && shouldSendMode(modelName)) {
-    payload.mode = "std";
-  }
-
-  const data = await klingFetch(getCreatePath(), {
+  const data = (await kieFetch(getCreatePath(), {
     method: "POST",
     body: JSON.stringify(payload),
-  }) as KlingPayload;
+  })) as KiePayload;
 
   const taskId =
-    data?.data?.task_id ??
-    data?.data?.id ??
-    data?.task_id ??
-    data?.id;
+    data.data?.taskId ??
+    data.data?.task_id ??
+    data.taskId ??
+    data.task_id;
 
   if (!taskId) {
-    throw new Error(`Kling API 回傳中找不到 task id: ${JSON.stringify(data)}`);
+    throw new Error(`KIE AI 回傳中找不到 task id: ${JSON.stringify(data)}`);
   }
 
   return {
@@ -165,26 +153,20 @@ export async function createKlingImageToVideoTask({
 }
 
 export async function queryKlingTask(taskId: string) {
-  const data = await klingFetch(getQueryPath(taskId), {
+  const data = (await kieFetch(getQueryPath(taskId), {
     method: "GET",
-  }) as KlingPayload;
+  })) as KiePayload;
 
   const status =
-    data?.data?.task_status ??
-    data?.data?.status ??
-    data?.task_status ??
-    data?.status;
-
-  const videoUrl =
-    data?.data?.task_result?.videos?.[0]?.url ??
-    data?.data?.task_result?.video_url ??
-    data?.data?.video_url ??
-    data?.video_url ??
-    null;
+    data.data?.state ??
+    data.data?.status ??
+    data.state ??
+    data.status ??
+    "unknown";
 
   return {
-    status: String(status ?? "unknown"),
-    videoUrl: videoUrl ? String(videoUrl) : null,
+    status: String(status),
+    videoUrl: extractVideoUrl(data),
     raw: data,
   };
 }

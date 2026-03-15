@@ -14,7 +14,7 @@ create table if not exists public.project_assets (
   file_name text not null,
   original_url text not null,
   generated_url text,
-  prompt_key text check (prompt_key in ('smile', 'greeting', 'laughing', 'handshake', 'hugging', 'brotherhood', 'blow-a-kiss', 'custom', 'static')),
+  prompt_key text check (prompt_key in ('smile', 'greeting', 'laughing', 'handshake', 'hugging', 'blow-a-kiss', 'custom', 'static')),
   prompt_label text,
   custom_prompt text,
   generation_status text not null default 'uploaded' check (generation_status in ('uploaded', 'queued', 'processing', 'completed', 'failed')),
@@ -51,7 +51,7 @@ alter table public.project_assets
 alter table public.project_assets drop constraint if exists project_assets_prompt_key_check;
 alter table public.project_assets
   add constraint project_assets_prompt_key_check
-  check (prompt_key in ('smile', 'greeting', 'laughing', 'handshake', 'hugging', 'brotherhood', 'blow-a-kiss', 'custom', 'static'));
+  check (prompt_key in ('smile', 'greeting', 'laughing', 'handshake', 'hugging', 'blow-a-kiss', 'custom', 'static'));
 
 create or replace function public.set_updated_at()
 returns trigger

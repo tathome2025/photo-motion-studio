@@ -1,6 +1,6 @@
 # MotionCut Studio
 
-極簡、線條主導的 web app，用來把相片批量送到 KlingAI 生成動態片段，然後在同一個專案內排時間線、調整過場與主題，最後輸出 MP4。
+極簡、線條主導的 web app，用來把相片批量送到 KIE AI 提供的 Kling Video 3 生成動態片段，然後在同一個專案內排時間線、調整過場與主題，最後輸出 MP4。
 
 ## 為什麼我選 Supabase
 
@@ -18,7 +18,7 @@
 - Next.js 16 App Router
 - Tailwind CSS 4
 - Supabase Database + Storage
-- KlingAI API for image-to-video generation
+- KIE AI Kling Video 3 API for image-to-video generation
 - `ffmpeg.wasm` client-side export
 - `dnd-kit` timeline sorting
 
@@ -29,7 +29,7 @@
 3. 上傳時自動把相片統一成 16:9，直向相片會左右補黑邊
 4. 顯示每張縮圖，最大視覺邊長小於 200px
 5. 為每張相片指定 prompt，可選自訂動作或直接保留靜態相片
-6. 批量提交 Kling 生成任務
+6. 批量提交 KIE AI Kling Video 3 生成任務
 7. 等待頁輪詢任務狀態，完成後自動跳到剪輯頁
 8. 已完成片段自動進入橫向 timeline
 9. 拖放重排次序、刪除片段、刪除生成結果、最多重新生成 3 次
@@ -41,7 +41,7 @@
 ```text
 src/app/                         頁面與 API routes
 src/components/                  前端互動元件
-src/lib/                         Supabase/Kling/data helpers
+src/lib/                         Supabase/KIE AI/data helpers
 supabase/schema.sql              建表與 storage bucket 建立腳本
 .env.example                     所需環境變數
 ```
@@ -64,27 +64,25 @@ npm run dev
 
 這個版本使用 server-side service role key 直接寫入資料表與 storage，適合你先快速 MVP 上線。之後若要開放公眾使用，建議再加上 Supabase Auth 與 RLS。
 
-## KlingAI 設定
+## KIE AI Kling Video 3 設定
 
 把以下值填入 `.env.local`：
 
 ```bash
-KLING_ACCESS_KEY=
-KLING_SECRET_KEY=
-KLING_API_BASE_URL=https://api-singapore.klingai.com
-KLING_IMAGE_TO_VIDEO_PATH=/v1/videos/image2video
-KLING_QUERY_TASK_TEMPLATE=/v1/videos/image2video/{taskId}
-KLING_MODEL_NAME=
-KLING_MODE=
+KIE_API_KEY=
+KIE_API_BASE_URL=https://api.kie.ai/api/v1
+KIE_CREATE_TASK_PATH=/jobs/createTask
+KIE_QUERY_TASK_TEMPLATE=/jobs/recordInfo?taskId={taskId}
+KIE_MODEL_NAME=kling-video-v3
+KIE_KLING_MODE=std
 KLING_DURATION_SECONDS=5
 ```
 
 說明：
 
-- 我把 Kling base URL 與 query path 都做成 env，因為官方文件版本與區域 endpoint 近年有變動。
-- `VIDEO 2.6` 看來是產品名稱，不一定等於 API 的 `model_name` slug。若你未能在 Kling developer console 找到精確 slug，先把 `KLING_MODEL_NAME` 留空，讓 API 使用帳戶預設模型。
-- `KLING_MODE` 預設留空；只有在你的帳號/模型明確要求時才填。
-- `src/lib/kling.ts` 已把 JWT bearer token 簽名與建立 / 查詢 task 的邏輯抽出，若你的帳號對應欄位格式不同，只需要在這個檔案微調。
+- `KIE_API_KEY` 是唯一必填的 provider key。
+- 預設 model 已改為 `kling-video-v3`。
+- `src/lib/kling.ts` 現在是走 KIE AI 的 Bearer Token、`createTask` 與 `recordInfo` 流程。
 
 ## 升級 schema
 
@@ -107,7 +105,7 @@ KLING_DURATION_SECONDS=5
 
 - `NEXT_PUBLIC_APP_URL=https://你的網域`
 
-這樣 Kling callback 與等待頁輪詢連結會正確。
+這樣 KIE AI callback 與等待頁輪詢連結會正確。
 
 ## 後續可再加
 
