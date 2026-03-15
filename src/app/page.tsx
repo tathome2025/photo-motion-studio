@@ -86,8 +86,16 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[340px_1fr]">
-        <CreateProjectForm />
+      <section className="grid gap-6">
+        <div className="grid gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
+              Create
+            </p>
+            <h2 className="text-2xl tracking-tight">新增專案</h2>
+          </div>
+          <CreateProjectForm />
+        </div>
 
         <div className="grid gap-4">
           <div className="flex items-end justify-between">
