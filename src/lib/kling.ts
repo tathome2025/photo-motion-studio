@@ -30,7 +30,7 @@ function getModelName() {
   const configured = process.env.KIE_MODEL_NAME?.trim();
 
   if (!configured) {
-    return "kling-3.0/video";
+    return "kling-2.6/image-to-video";
   }
 
   const normalized = configured.toLowerCase();
@@ -42,6 +42,15 @@ function getModelName() {
     normalized === "kling-3"
   ) {
     return "kling-3.0/video";
+  }
+
+  if (
+    normalized === "kling-2.6" ||
+    normalized === "kling2.6" ||
+    normalized === "kling 2.6" ||
+    normalized === "kling-2.6/image-to-video"
+  ) {
+    return "kling-2.6/image-to-video";
   }
 
   return configured;
@@ -149,19 +158,25 @@ export async function createKlingImageToVideoTask({
   callbackUrl,
 }: CreateKlingTaskInput) {
   const duration = Number(process.env.KLING_DURATION_SECONDS ?? DEFAULT_CLIP_DURATION);
+  const model = getModelName();
+  const input: Record<string, unknown> = {
+    prompt,
+    image_urls: [imageUrl],
+    duration: String(duration),
+    sound: getSoundEnabled(),
+  };
+
+  if (model === "kling-3.0/video") {
+    input.aspect_ratio = "16:9";
+    input.mode = process.env.KIE_KLING_MODE?.trim() || "std";
+    input.multi_shots = false;
+  }
+
   const payload: Record<string, unknown> = {
-    model: getModelName(),
+    model,
     callBackUrl:
       callbackUrl && !callbackUrl.includes("localhost") ? callbackUrl : undefined,
-    input: {
-      prompt,
-      image_urls: [imageUrl],
-      duration: String(duration),
-      aspect_ratio: "16:9",
-      mode: process.env.KIE_KLING_MODE?.trim() || "std",
-      sound: getSoundEnabled(),
-      multi_shots: false,
-    },
+    input,
   };
 
   const data = (await kieFetch(getCreatePath(), {

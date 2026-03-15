@@ -1,6 +1,6 @@
 # MotionCut Studio
 
-極簡、線條主導的 web app，用來把相片批量送到 KIE AI 提供的 Kling Video 3 生成動態片段，然後在同一個專案內排時間線、調整過場與主題，最後輸出 MP4。
+極簡、線條主導的 web app，用來把相片批量送到 KIE AI 提供的 Kling 2.6 image-to-video 生成動態片段，然後在同一個專案內排時間線、調整過場與主題，最後輸出 MP4。
 
 ## 為什麼我選 Supabase
 
@@ -18,7 +18,7 @@
 - Next.js 16 App Router
 - Tailwind CSS 4
 - Supabase Database + Storage
-- KIE AI Kling Video 3 API for image-to-video generation
+- KIE AI Kling 2.6 image-to-video API
 - `ffmpeg.wasm` client-side export
 - `dnd-kit` timeline sorting
 
@@ -30,7 +30,7 @@
 4. 生成 prompt 會自動要求模型忽略補邊區域，並自然補足成完整 16:9 畫面
 5. 顯示每張縮圖，最大視覺邊長小於 200px
 6. 為每張相片指定 prompt，可選自訂動作或直接保留靜態相片
-7. 批量提交 KIE AI Kling Video 3 生成任務
+7. 批量提交 KIE AI Kling 2.6 image-to-video 生成任務
 8. 等待頁輪詢任務狀態，完成後自動跳到剪輯頁
 9. 已完成片段自動進入橫向 timeline
 10. 拖放重排次序、刪除片段、刪除生成結果、最多重新生成 3 次
@@ -65,7 +65,7 @@ npm run dev
 
 這個版本使用 server-side service role key 直接寫入資料表與 storage，適合你先快速 MVP 上線。之後若要開放公眾使用，建議再加上 Supabase Auth 與 RLS。
 
-## KIE AI Kling Video 3 設定
+## KIE AI Kling 2.6 設定
 
 把以下值填入 `.env.local`：
 
@@ -74,8 +74,8 @@ KIE_API_KEY=
 KIE_API_BASE_URL=https://api.kie.ai/api/v1
 KIE_CREATE_TASK_PATH=/jobs/createTask
 KIE_QUERY_TASK_TEMPLATE=/jobs/recordInfo?taskId={taskId}
-KIE_MODEL_NAME=kling-3.0/video
-KIE_KLING_MODE=std
+KIE_MODEL_NAME=kling-2.6/image-to-video
+KIE_KLING_MODE=
 KIE_ENABLE_SOUND=false
 KLING_DURATION_SECONDS=5
 ```
@@ -83,9 +83,11 @@ KLING_DURATION_SECONDS=5
 說明：
 
 - `KIE_API_KEY` 是唯一必填的 provider key。
-- 預設 model 已改為 `kling-3.0/video`。
+- 預設 model 已改為 `kling-2.6/image-to-video`。
+- 預設是 5 秒、無聲。
+- `KIE_KLING_MODE` 對 2.6 image-to-video 不需要，保留空白即可；只有 3.0 類模型才會額外送 `mode` 與 `multi_shots`。
 - `KIE_ENABLE_SOUND` 預設為 `false`，因為 KIE AI 這個模型要求 `sound` 欄位必須顯式傳入。
-- `src/lib/kling.ts` 現在是走 KIE AI 的 Bearer Token、`createTask` 與 `recordInfo` 流程。
+- `src/lib/kling.ts` 現在會依模型自動切換 payload，2.6 image-to-video 只送官方範例需要的欄位。
 
 ## 升級 schema
 
