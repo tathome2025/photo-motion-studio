@@ -27,6 +27,7 @@ const selectionSchema = z.object({
     "static",
   ]),
   customPrompt: z.string().trim().max(280).optional().nullable(),
+  shouldGenerate: z.boolean().optional().default(true),
 });
 
 const payloadSchema = z.object({
@@ -73,7 +74,28 @@ export async function POST(
       );
     }
 
-    await savePromptSelections(projectId, payload.selections);
+    const selectedAssets = project.assets.filter((asset) => {
+      const selection = payload.selections.find((item) => item.id === asset.id);
+      return selection?.shouldGenerate ?? false;
+    });
+
+    if (selectedAssets.length === 0) {
+      return NextResponse.json(
+        { error: "請先選擇要生成的新相片，或勾選需要重新生成的已完成片段。" },
+        { status: 400 },
+      );
+    }
+
+    await savePromptSelections(
+      projectId,
+      payload.selections
+        .filter((selection) => selection.shouldGenerate)
+        .map(({ id, promptKey, customPrompt }) => ({
+          id,
+          promptKey,
+          customPrompt,
+        })),
+    );
     await markProjectStatus(projectId, "generating");
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
@@ -87,12 +109,23 @@ export async function POST(
         throw new Error(`缺少片段 ${asset.fileName} 的 prompt。`);
       }
 
+      if (!selection.shouldGenerate) {
+        continue;
+      }
+
+      const isRegeneration =
+        asset.generationStatus === "completed" ||
+        Boolean(asset.generatedUrl) ||
+        asset.isStaticClip;
+
       try {
         if (selection.promptKey === "static") {
           await markAssetStaticCompleted({
             projectId,
             assetId: asset.id,
             promptKey: selection.promptKey,
+            customPrompt: selection.customPrompt,
+            isRegeneration,
           });
           queuedCount += 1;
           continue;
@@ -109,6 +142,7 @@ export async function POST(
           promptKey: selection.promptKey,
           customPrompt: selection.customPrompt,
           klingTaskId: task.taskId,
+          isRegeneration,
         });
 
         queuedCount += 1;

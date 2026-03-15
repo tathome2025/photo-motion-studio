@@ -88,6 +88,14 @@ export function UploadPromptBoard({
 }: UploadPromptBoardProps) {
   const router = useRouter();
   const [assets, setAssets] = useState(initialAssets);
+  const [generationSelection, setGenerationSelection] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      initialAssets.map((asset) => [
+        asset.id,
+        asset.generationStatus !== "completed",
+      ]),
+    ),
+  );
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
     currentFile: number;
@@ -101,10 +109,20 @@ export function UploadPromptBoard({
   const [isPending, startTransition] = useTransition();
 
   const hasAssets = assets.length > 0;
+  const generationCount = assets.filter(
+    (asset) => generationSelection[asset.id] ?? asset.generationStatus !== "completed",
+  ).length;
   const allPromptSelected = useMemo(
     () =>
-      assets.length > 0 &&
+      generationCount > 0 &&
       assets.every((asset) => {
+        const shouldGenerate =
+          generationSelection[asset.id] ?? asset.generationStatus !== "completed";
+
+        if (!shouldGenerate) {
+          return true;
+        }
+
         if (!asset.promptKey) {
           return false;
         }
@@ -115,8 +133,12 @@ export function UploadPromptBoard({
 
         return true;
       }),
-    [assets],
+    [assets, generationCount, generationSelection],
   );
+
+  function isSelectedForGeneration(asset: ProjectAsset) {
+    return generationSelection[asset.id] ?? asset.generationStatus !== "completed";
+  }
 
   async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -180,6 +202,15 @@ export function UploadPromptBoard({
         uploadedBytes += file.size;
         latestAssets = data.assets ?? latestAssets;
         setAssets(latestAssets);
+        setGenerationSelection((current) => {
+          const next: Record<string, boolean> = {};
+
+          for (const asset of latestAssets) {
+            next[asset.id] = current[asset.id] ?? asset.generationStatus !== "completed";
+          }
+
+          return next;
+        });
         setUploadProgress({
           currentFile: index + 1,
           totalFiles: files.length,
@@ -215,6 +246,11 @@ export function UploadPromptBoard({
     }
 
     setAssets((current) => current.filter((asset) => asset.id !== assetId));
+    setGenerationSelection((current) => {
+      const next = { ...current };
+      delete next[assetId];
+      return next;
+    });
     router.refresh();
   }
 
@@ -249,6 +285,13 @@ export function UploadPromptBoard({
     );
   }
 
+  function handleGenerationSelectionChange(assetId: string, checked: boolean) {
+    setGenerationSelection((current) => ({
+      ...current,
+      [assetId]: checked,
+    }));
+  }
+
   function handleGenerate() {
     setGenerateError(null);
 
@@ -263,6 +306,7 @@ export function UploadPromptBoard({
             id: asset.id,
             promptKey: asset.promptKey,
             customPrompt: asset.customPrompt,
+            shouldGenerate: isSelectedForGeneration(asset),
           })),
         }),
       });
@@ -342,6 +386,9 @@ export function UploadPromptBoard({
               Prompt assignment
             </p>
             <h2 className="text-2xl tracking-tight">為每張相片指定動作</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--muted)]">
+              新加入相片會自動納入本次生成。已完成片段會保留現有結果，只有勾選後才會重新生成。
+            </p>
           </div>
           <button
             type="button"
@@ -386,12 +433,30 @@ export function UploadPromptBoard({
                   <span className="truncate">{asset.fileName}</span>
                   <span>{asset.regenerationCount}/{MAX_REGENERATION_COUNT} re-gen</span>
                 </div>
+                {asset.generationStatus === "completed" ? (
+                  <label className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5"
+                      checked={isSelectedForGeneration(asset)}
+                      onChange={(event) =>
+                        handleGenerationSelectionChange(asset.id, event.target.checked)
+                      }
+                    />
+                    勾選後重新生成
+                  </label>
+                ) : (
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+                    新加入相片將於本次生成
+                  </div>
+                )}
                 <select
                   className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm outline-none focus:border-[var(--text)]"
                   value={asset.promptKey ?? ""}
                   onChange={(event) =>
                     handlePromptChange(asset.id, event.target.value as PromptKey)
                   }
+                  disabled={asset.generationStatus === "completed" && !isSelectedForGeneration(asset)}
                 >
                   <option value="">選擇動作 prompt</option>
                   {PROMPT_OPTIONS.map((option) => (
@@ -408,6 +473,7 @@ export function UploadPromptBoard({
                     onChange={(event) =>
                       handleCustomPromptChange(asset.id, event.target.value)
                     }
+                    disabled={asset.generationStatus === "completed" && !isSelectedForGeneration(asset)}
                   />
                 ) : null}
               </article>
