@@ -3,7 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-export function CreateProjectForm() {
+interface CreateProjectFormProps {
+  compact?: boolean;
+}
+
+export function CreateProjectForm({ compact = false }: CreateProjectFormProps) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +39,11 @@ export function CreateProjectForm() {
   }
 
   return (
-    <form className="grid gap-4 border border-[var(--line)] p-5" onSubmit={handleSubmit}>
+    <form
+      className={compact ? "grid gap-4" : "grid gap-4 border border-[var(--line)] p-5"}
+      onSubmit={handleSubmit}
+    >
       <div className="space-y-2">
-        <label className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-          New project
-        </label>
         <input
           required
           className="h-12 border border-[var(--line)] bg-transparent px-4 text-sm outline-none transition focus:border-[var(--text)]"

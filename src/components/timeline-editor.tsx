@@ -120,14 +120,10 @@ function SortableTimelineClip({
   asset,
   isSelected,
   onSelect,
-  checkedForRegeneration,
-  onCheckedChange,
 }: {
   asset: ProjectAsset;
   isSelected: boolean;
   onSelect: (assetId: string) => void;
-  checkedForRegeneration: boolean;
-  onCheckedChange: (assetId: string, checked: boolean) => void;
 }) {
   const {
     attributes,
@@ -176,17 +172,8 @@ function SortableTimelineClip({
         </div>
       </button>
 
-      <div className="flex items-center justify-between gap-3">
-        <label className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">
-          <input
-            type="checkbox"
-            className="h-3.5 w-3.5"
-            checked={checkedForRegeneration}
-            onChange={(event) => onCheckedChange(asset.id, event.target.checked)}
-            disabled={asset.regenerationCount >= MAX_REGENERATION_COUNT}
-          />
-          {asset.regenerationCount}/{MAX_REGENERATION_COUNT} re-gen
-        </label>
+      <div className="flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">
+        <span>{asset.regenerationCount}/{MAX_REGENERATION_COUNT} re-gen</span>
         <button
           type="button"
           className="grid h-9 w-9 place-items-center border border-[var(--line)]"
@@ -287,6 +274,38 @@ export function TimelineEditor({
       }
     : null;
 
+  function persistTimeline(nextAssets: ProjectAsset[], successMessage = "時間線已儲存。") {
+    setError(null);
+    setStatusMessage(null);
+
+    startTransition(async () => {
+      const payload: TimelineUpdateItem[] = nextAssets.map((asset, index) => ({
+        id: asset.id,
+        timelineOrder: index,
+        transitionKey: asset.transitionKey,
+        themeKey: asset.themeKey,
+        frameStyleKey: asset.frameStyleKey,
+      }));
+
+      const response = await fetch(`/api/projects/${projectId}/timeline`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ items: payload }),
+      });
+
+      const data = await parseApiResponse(response);
+
+      if (!response.ok) {
+        setError(data.error ?? "儲存時間線失敗。");
+        return;
+      }
+
+      setStatusMessage(successMessage);
+    });
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
@@ -296,7 +315,9 @@ export function TimelineEditor({
 
     const oldIndex = assets.findIndex((asset) => asset.id === active.id);
     const newIndex = assets.findIndex((asset) => asset.id === over.id);
-    setAssets((current) => arrayMove(current, oldIndex, newIndex));
+    const nextAssets = arrayMove(assets, oldIndex, newIndex);
+    setAssets(nextAssets);
+    persistTimeline(nextAssets, "排序已自動儲存。");
   }
 
   function handleSelectedFieldChange(
@@ -339,35 +360,7 @@ export function TimelineEditor({
   }
 
   function saveTimelineEdits() {
-    setError(null);
-    setStatusMessage(null);
-
-    startTransition(async () => {
-      const payload: TimelineUpdateItem[] = assets.map((asset, index) => ({
-        id: asset.id,
-        timelineOrder: index,
-        transitionKey: asset.transitionKey,
-        themeKey: asset.themeKey,
-        frameStyleKey: asset.frameStyleKey,
-      }));
-
-      const response = await fetch(`/api/projects/${projectId}/timeline`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ items: payload }),
-      });
-
-      const data = await parseApiResponse(response);
-
-      if (!response.ok) {
-        setError(data.error ?? "儲存時間線失敗。");
-        return;
-      }
-
-      setStatusMessage("時間線已儲存。");
-    });
+    persistTimeline(assets);
   }
 
   async function deleteClip() {
@@ -706,9 +699,41 @@ export function TimelineEditor({
               </div>
             </div>
             <p className="text-sm leading-6 text-[var(--muted)]">
-              先在時間線勾選要重新生成的片段，再以目前選取片段設定動作。
+              在這個區塊勾選要重新生成的片段，再以目前選取片段設定動作。
               已勾選 {checkedAssetIds.length} 項。
             </p>
+            <div className="grid max-h-48 gap-2 overflow-y-auto border border-[var(--line)] p-3">
+              {assets.map((asset) => (
+                <div
+                  key={asset.id}
+                  className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.16em] text-[var(--muted)]"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5"
+                      checked={Boolean(regeneratePlan[asset.id]?.checked)}
+                      onChange={(event) =>
+                        handleRegenerateSettingChange(asset.id, {
+                          checked: event.target.checked,
+                        })
+                      }
+                      disabled={asset.regenerationCount >= MAX_REGENERATION_COUNT}
+                    />
+                    <button
+                      type="button"
+                      className={`truncate text-left transition ${
+                        selectedAsset.id === asset.id ? "text-[var(--text)]" : ""
+                      }`}
+                      onClick={() => setSelectedAssetId(asset.id)}
+                    >
+                      {asset.fileName}
+                    </button>
+                  </span>
+                  <span>{asset.regenerationCount}/{MAX_REGENERATION_COUNT}</span>
+                </div>
+              ))}
+            </div>
             <select
               className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm outline-none focus:border-[var(--text)]"
               value={selectedRegenerateSettings?.promptKey ?? "smile"}
@@ -794,10 +819,6 @@ export function TimelineEditor({
                     asset={asset}
                     isSelected={asset.id === selectedAsset.id}
                     onSelect={setSelectedAssetId}
-                    checkedForRegeneration={Boolean(regeneratePlan[asset.id]?.checked)}
-                    onCheckedChange={(assetId, checked) =>
-                      handleRegenerateSettingChange(assetId, { checked })
-                    }
                   />
                 ))}
               </div>
