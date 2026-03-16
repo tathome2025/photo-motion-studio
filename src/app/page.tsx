@@ -67,6 +67,53 @@ export default async function HomePage() {
                 : "這個版本為 GitHub + Vercel 部署而設計，使用專案資料與媒體檔案管理，並會自動更新生成進度。"}
             </p>
           </div>
+          <div className="hero-generator border border-[var(--line)] bg-[var(--surface)] p-4">
+            <div className="hero-generator__scan" />
+            <div className="relative grid gap-4 md:grid-cols-[160px_1fr_180px] md:items-center">
+              <div className="hero-generator__source grid gap-3 border border-[var(--line)] p-3">
+                <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">
+                  <span>{locale === "en" ? "Source" : "來源"}</span>
+                  <span>01</span>
+                </div>
+                <div className="hero-generator__photo-frame grid aspect-[4/5] place-items-center border border-[var(--line)]">
+                  <div className="hero-generator__photo-silhouette" />
+                </div>
+              </div>
+
+              <div className="hero-generator__bridge relative hidden h-full min-h-32 md:block">
+                <div className="hero-generator__bridge-line absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-[var(--line)]" />
+                <div className="hero-generator__bridge-beam absolute top-1/2 h-3 w-20 -translate-y-1/2 border border-[var(--text)] bg-[var(--surface)]" />
+                <div className="hero-generator__bridge-node absolute left-[8%] top-1/2 h-3 w-3 -translate-y-1/2 border border-[var(--text)] bg-[var(--surface)]" />
+                <div className="hero-generator__bridge-node hero-generator__bridge-node--mid absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 border border-[var(--text)] bg-[var(--surface)]" />
+                <div className="hero-generator__bridge-node hero-generator__bridge-node--end absolute right-[8%] top-1/2 h-3 w-3 -translate-y-1/2 border border-[var(--text)] bg-[var(--surface)]" />
+                <div className="hero-generator__pulse absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 border border-[var(--line)]" />
+              </div>
+
+              <div className="hero-generator__result grid gap-3 border border-[var(--line)] p-3">
+                <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">
+                  <span>{locale === "en" ? "Timeline" : "時間線"}</span>
+                  <span>{locale === "en" ? "Live" : "同步中"}</span>
+                </div>
+                <div className="grid gap-2">
+                  <div className="hero-generator__timeline-row">
+                    <span className="hero-generator__timeline-block hero-generator__timeline-block--primary" />
+                    <span className="hero-generator__timeline-block hero-generator__timeline-block--ghost" />
+                    <span className="hero-generator__timeline-block hero-generator__timeline-block--accent" />
+                  </div>
+                  <div className="hero-generator__timeline-row">
+                    <span className="hero-generator__timeline-block hero-generator__timeline-block--ghost" />
+                    <span className="hero-generator__timeline-block hero-generator__timeline-block--primary" />
+                    <span className="hero-generator__timeline-block hero-generator__timeline-block--ghost" />
+                  </div>
+                  <div className="hero-generator__timeline-row">
+                    <span className="hero-generator__timeline-block hero-generator__timeline-block--accent" />
+                    <span className="hero-generator__timeline-block hero-generator__timeline-block--ghost" />
+                    <span className="hero-generator__timeline-block hero-generator__timeline-block--primary" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-4 border border-[var(--line)] p-5">
