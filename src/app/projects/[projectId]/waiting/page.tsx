@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { WaitingRoom } from "@/components/waiting-room";
 import { getProjectDetails } from "@/lib/data";
+import { getServerLocale } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ interface WaitingPageProps {
 
 export default async function WaitingPage({ params }: WaitingPageProps) {
   const { projectId } = await params;
+  const locale = await getServerLocale();
   const project = await getProjectDetails(projectId);
 
   if (!project) {
@@ -29,7 +31,7 @@ export default async function WaitingPage({ params }: WaitingPageProps) {
       <section className="flex items-end justify-between border border-[var(--line-strong)] p-6">
         <div>
           <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-            Generation queue
+            {locale === "en" ? "Generation queue" : "生成佇列"}
           </p>
           <h1 className="text-4xl tracking-[-0.05em]">{project.name}</h1>
         </div>
@@ -37,7 +39,7 @@ export default async function WaitingPage({ params }: WaitingPageProps) {
           href="/"
           className="inline-flex h-12 items-center justify-center border border-[var(--line)] px-5 text-sm uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
         >
-          回到首頁
+          {locale === "en" ? "Back home" : "回到首頁"}
         </Link>
       </section>
 
@@ -45,6 +47,7 @@ export default async function WaitingPage({ params }: WaitingPageProps) {
         projectId={projectId}
         initialTotal={project.assetCount}
         initialCompleted={project.completedCount}
+        locale={locale}
       />
     </main>
   );

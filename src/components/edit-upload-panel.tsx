@@ -8,10 +8,12 @@ import {
   JPEG_ACCEPT,
   prepareJpegFileForUpload,
 } from "@/lib/client-upload";
+import type { Locale } from "@/lib/i18n";
 
 interface EditUploadPanelProps {
   projectId: string;
   currentAssetCount: number;
+  locale: Locale;
 }
 
 interface ApiResponse {
@@ -30,17 +32,17 @@ function formatSpeed(bytesPerSecond: number) {
   return `${(bytesPerSecond / 1024).toFixed(0)} KB/s`;
 }
 
-async function parseApiResponse(response: Response) {
+async function parseApiResponse(response: Response, tooLargeMessage: string) {
   const rawText = await response.text();
 
   try {
     return JSON.parse(rawText) as ApiResponse;
   } catch {
     if (response.status === 413 || rawText.startsWith("Request Entity Too Large")) {
-      throw new Error("單張 JPG 檔案仍超過部署平台上傳上限，請先縮小相片後再試。");
+      throw new Error(tooLargeMessage);
     }
 
-    throw new Error(rawText || `請求失敗 (${response.status})`);
+    throw new Error(rawText || `Request failed (${response.status})`);
   }
 }
 
@@ -63,7 +65,7 @@ function uploadFileWithProgress(
 
       onProgress(event.loaded, performance.now() - startedAt);
     };
-    xhr.onerror = () => reject(new Error("上傳失敗。"));
+    xhr.onerror = () => reject(new Error("Upload failed."));
     xhr.onload = () => {
       resolve(
         new Response(xhr.responseText, {
@@ -82,6 +84,7 @@ function uploadFileWithProgress(
 export function EditUploadPanel({
   projectId,
   currentAssetCount,
+  locale,
 }: EditUploadPanelProps) {
   const router = useRouter();
   const [isUploading, setIsUploading] = useState(false);
@@ -94,6 +97,46 @@ export function EditUploadPanel({
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const copy =
+    locale === "en"
+      ? {
+          tooLarge: "A single JPG file is still above the deployment upload limit. Reduce the image size and try again.",
+          uploadFailed: "Upload failed.",
+          maxSelection: "You can select up to 100 photos per upload.",
+          invalidTypePrefix: "Only JPG / JPEG files are accepted. Please check: ",
+          maxProjectPhotos: (count: number) =>
+            `This project can contain up to 100 photos. It currently has ${count}.`,
+          uploaded: "New photos uploaded. Redirecting to the setup page.",
+          sectionLabel: "Add photos",
+          title: "Add more photos while editing",
+          description:
+            "Upload multiple photos in one go, up to 100 per project. Front-facing group photos and landscape images work best. Only JPG / JPEG files are accepted. Portrait photos are extended with a blurred background and normalized to 16:9. After upload, you will return to setup to assign actions for the new photos.",
+          uploadButton: "Upload more photos",
+          uploadingButton: "Uploading...",
+          currentCount: (count: number) => `${count}/100 in project`,
+          uploading: (current: number, total: number) => `Uploading ${current}/${total}`,
+          uploadedAmount: (loaded: number, total: number) =>
+            `Uploaded ${(loaded / 1024 / 1024).toFixed(2)} / ${(total / 1024 / 1024).toFixed(2)} MB`,
+        }
+      : {
+          tooLarge: "單張 JPG 檔案仍超過部署平台上傳上限，請先縮小相片後再試。",
+          uploadFailed: "上傳失敗。",
+          maxSelection: "單次最多選擇 100 張相片。",
+          invalidTypePrefix: "只接受 JPG / JPEG。請檢查：",
+          maxProjectPhotos: (count: number) =>
+            `此專案最多只可有 100 張相片，現有 ${count} 張。`,
+          uploaded: "新增相片已上傳，正在切換到設定頁。",
+          sectionLabel: "Add photos",
+          title: "剪輯途中可再新增相片",
+          description:
+            "可一次選取多張相片批量上傳，單一專案最多 100 張。建議上傳面向鏡頭的合照及橫向相片；只接受 JPG / JPEG。直向相片會自動延展成模糊背景，統一整理成 16:9。新增完成後會回到設定頁，先為新相片選擇動作再提交。",
+          uploadButton: "新增上傳相片",
+          uploadingButton: "上傳中...",
+          currentCount: (count: number) => `目前 ${count}/100 張`,
+          uploading: (current: number, total: number) => `Uploading ${current}/${total}`,
+          uploadedAmount: (loaded: number, total: number) =>
+            `已上傳 ${(loaded / 1024 / 1024).toFixed(2)} / ${(total / 1024 / 1024).toFixed(2)} MB`,
+        };
 
   async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -103,7 +146,7 @@ export function EditUploadPanel({
     }
 
     if (files.length > 100) {
-      setError("單次最多選擇 100 張相片。");
+      setError(copy.maxSelection);
       event.target.value = "";
       return;
     }
@@ -111,13 +154,13 @@ export function EditUploadPanel({
     const invalidFiles = findInvalidJpegFiles(files);
 
     if (invalidFiles.length > 0) {
-      setError(`只接受 JPG / JPEG。請檢查：${invalidFiles.map((file) => file.name).join(", ")}`);
+      setError(`${copy.invalidTypePrefix}${invalidFiles.map((file) => file.name).join(", ")}`);
       event.target.value = "";
       return;
     }
 
     if (currentAssetCount + files.length > 100) {
-      setError(`此專案最多只可有 100 張相片，現有 ${currentAssetCount} 張。`);
+      setError(copy.maxProjectPhotos(currentAssetCount));
       event.target.value = "";
       return;
     }
@@ -159,11 +202,13 @@ export function EditUploadPanel({
           },
         );
 
-        const data = await parseApiResponse(response);
+        const data = await parseApiResponse(response, copy.tooLarge);
 
         if (!response.ok) {
           throw new Error(
-            data.error ? `${originalFile.name}: ${data.error}` : `${originalFile.name}: 上傳失敗。`,
+            data.error
+              ? `${originalFile.name}: ${data.error}`
+              : `${originalFile.name}: ${copy.uploadFailed}`,
           );
         }
 
@@ -177,11 +222,11 @@ export function EditUploadPanel({
         });
       }
 
-      setStatusMessage("新增相片已上傳，正在切換到設定頁。");
+      setStatusMessage(copy.uploaded);
       router.push(`/projects/${projectId}`);
       router.refresh();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "上傳失敗。");
+      setError(reason instanceof Error ? reason.message : copy.uploadFailed);
     } finally {
       setIsUploading(false);
       setUploadProgress(null);
@@ -193,18 +238,17 @@ export function EditUploadPanel({
     <section className="grid gap-4 border border-[var(--line)] p-5">
       <div className="grid gap-2">
         <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-          Add photos
+          {copy.sectionLabel}
         </p>
-        <h2 className="text-2xl tracking-tight">剪輯途中可再新增相片</h2>
+        <h2 className="text-2xl tracking-tight">{copy.title}</h2>
         <p className="max-w-3xl text-sm leading-7 text-[var(--muted)]">
-          可一次選取多張相片批量上傳，單一專案最多 100 張。建議上傳面向鏡頭的合照及橫向相片；
-          只接受 JPG / JPEG。直向相片會自動延展成模糊背景，統一整理成 16:9。新增完成後會回到設定頁，先為新相片選擇動作再提交。
+          {copy.description}
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
         <label className="inline-flex h-12 cursor-pointer items-center justify-center border border-[var(--text)] px-5 text-sm uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)]">
-          {isUploading ? "上傳中..." : "新增上傳相片"}
+          {isUploading ? copy.uploadingButton : copy.uploadButton}
           <input
             type="file"
             accept={JPEG_ACCEPT}
@@ -215,7 +259,7 @@ export function EditUploadPanel({
           />
         </label>
         <div className="text-sm text-[var(--muted)]">
-          目前 {currentAssetCount}/100 張
+          {copy.currentCount(currentAssetCount)}
         </div>
       </div>
 
@@ -223,7 +267,7 @@ export function EditUploadPanel({
         <div className="grid gap-3 border border-[var(--line)] bg-[var(--surface-soft)] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
             <span>
-              Uploading {uploadProgress.currentFile}/{uploadProgress.totalFiles}
+              {copy.uploading(uploadProgress.currentFile, uploadProgress.totalFiles)}
             </span>
             <span>{uploadProgress.speed}</span>
           </div>
@@ -240,8 +284,7 @@ export function EditUploadPanel({
             />
           </div>
           <div className="text-sm text-[var(--muted)]">
-            已上傳 {(uploadProgress.loadedBytes / 1024 / 1024).toFixed(2)} /{" "}
-            {(uploadProgress.totalBytes / 1024 / 1024).toFixed(2)} MB
+            {copy.uploadedAmount(uploadProgress.loadedBytes, uploadProgress.totalBytes)}
           </div>
         </div>
       ) : null}

@@ -4,12 +4,14 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-import { MAX_REGENERATION_COUNT, PROMPT_OPTIONS } from "@/lib/constants";
+import { MAX_REGENERATION_COUNT } from "@/lib/constants";
+import { getPromptOptions, type Locale } from "@/lib/i18n";
 import type { ProjectAsset, PromptKey } from "@/lib/types";
 
 interface RegenerateBoardProps {
   projectId: string;
   initialAssets: ProjectAsset[];
+  locale: Locale;
 }
 
 interface ApiResponse {
@@ -22,15 +24,17 @@ async function parseApiResponse(response: Response) {
   try {
     return JSON.parse(rawText) as ApiResponse;
   } catch {
-    throw new Error(rawText || `請求失敗 (${response.status})`);
+    throw new Error(rawText || `Request failed (${response.status})`);
   }
 }
 
 export function RegenerateBoard({
   projectId,
   initialAssets,
+  locale,
 }: RegenerateBoardProps) {
   const router = useRouter();
+  const promptOptions = getPromptOptions(locale);
   const [plans, setPlans] = useState<
     Record<
       string,
@@ -55,6 +59,40 @@ export function RegenerateBoard({
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const copy =
+    locale === "en"
+      ? {
+          selectFirst: "Select at least one photo to regenerate.",
+          customPromptRequired: 'Please enter a prompt when "Custom action" is selected.',
+          regenerateFailed: "Failed to regenerate.",
+          partial: (successCount: number, failureCount: number) =>
+            `${successCount} item(s) submitted. ${failureCount} item(s) could not be submitted.`,
+          title: "Select and regenerate in one pass",
+          description:
+            "All thumbnails are listed together. Select the photos you want to regenerate, then choose an action for each one.",
+          submitting: "Submitting...",
+          submitSelected: (count: number) => `Regenerate selected (${count})`,
+          regenerateLabel: "re-gen",
+          limitReached: "Limit reached. Delete the photo and upload it again.",
+          checkToRegenerate: "Select to regenerate",
+          customPlaceholder: "Enter a custom action prompt",
+        }
+      : {
+          selectFirst: "請先勾選要重新生成的相片。",
+          customPromptRequired: "選擇「其他動作」時請輸入 prompt。",
+          regenerateFailed: "重新生成失敗。",
+          partial: (successCount: number, failureCount: number) =>
+            `已提交 ${successCount} 項，另有 ${failureCount} 項未能提交。`,
+          title: "一次過勾選並重新生成",
+          description:
+            "所有縮圖會一次列出。你可以按相片逐一勾選，並為每張相片獨立選擇生成動作。",
+          submitting: "提交中...",
+          submitSelected: (count: number) => `重新生成已勾選項目 (${count})`,
+          regenerateLabel: "重新生成",
+          limitReached: "已達上限，請刪除相片再重新上傳生成",
+          checkToRegenerate: "勾選後重新生成",
+          customPlaceholder: "輸入自訂動作 prompt",
+        };
 
   const checkedAssetIds = useMemo(
     () =>
@@ -81,7 +119,7 @@ export function RegenerateBoard({
 
   function submitSelected() {
     if (checkedAssetIds.length === 0) {
-      setError("請先勾選要重新生成的相片。");
+      setError(copy.selectFirst);
       return;
     }
 
@@ -100,7 +138,7 @@ export function RegenerateBoard({
         }
 
         if (plan.promptKey === "custom" && !plan.customPrompt.trim()) {
-          failures.push(`${asset.fileName}: 選擇「其他動作」時請輸入 prompt。`);
+          failures.push(`${asset.fileName}: ${copy.customPromptRequired}`);
           continue;
         }
 
@@ -121,7 +159,11 @@ export function RegenerateBoard({
         const data = await parseApiResponse(response);
 
         if (!response.ok) {
-          failures.push(data.error ? `${asset.fileName}: ${data.error}` : `${asset.fileName}: 重新生成失敗。`);
+          failures.push(
+            data.error
+              ? `${asset.fileName}: ${data.error}`
+              : `${asset.fileName}: ${copy.regenerateFailed}`,
+          );
           continue;
         }
 
@@ -129,12 +171,12 @@ export function RegenerateBoard({
       }
 
       if (successCount === 0) {
-        setError(failures[0] ?? "重新生成失敗。");
+        setError(failures[0] ?? copy.regenerateFailed);
         return;
       }
 
       if (failures.length > 0) {
-        setStatusMessage(`已提交 ${successCount} 項，另有 ${failures.length} 項未能提交。`);
+        setStatusMessage(copy.partial(successCount, failures.length));
       }
 
       router.push(`/projects/${projectId}/waiting`);
@@ -149,9 +191,9 @@ export function RegenerateBoard({
           <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
             Regenerate
           </p>
-          <h2 className="text-3xl tracking-tight">一次過勾選並重新生成</h2>
+          <h2 className="text-3xl tracking-tight">{copy.title}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--muted)]">
-            所有縮圖會一次列出。你可以按相片逐一勾選，並為每張相片獨立選擇生成動作。
+            {copy.description}
           </p>
         </div>
         <button
@@ -160,7 +202,7 @@ export function RegenerateBoard({
           onClick={submitSelected}
           disabled={isPending || checkedAssetIds.length === 0}
         >
-          {isPending ? "提交中..." : `重新生成已勾選項目 (${checkedAssetIds.length})`}
+          {isPending ? copy.submitting : copy.submitSelected(checkedAssetIds.length)}
         </button>
       </div>
 
@@ -177,7 +219,9 @@ export function RegenerateBoard({
             >
               <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
                 <span>#{String(index + 1).padStart(2, "0")}</span>
-                <span>{asset.regenerationCount}/{MAX_REGENERATION_COUNT} re-gen</span>
+                <span>
+                  {asset.regenerationCount}/{MAX_REGENERATION_COUNT} {copy.regenerateLabel}
+                </span>
               </div>
 
               <div className="grid aspect-video place-items-center overflow-hidden border border-[var(--line)] bg-black">
@@ -200,7 +244,7 @@ export function RegenerateBoard({
                     }
                     disabled={limitReached}
                   />
-                  {limitReached ? "已達上限，請刪除相片再重新上傳生成" : "勾選後重新生成"}
+                  {limitReached ? copy.limitReached : copy.checkToRegenerate}
                 </label>
               </div>
 
@@ -212,7 +256,7 @@ export function RegenerateBoard({
                 }
                 disabled={!isSelected || limitReached}
               >
-                {PROMPT_OPTIONS.map((option) => (
+                {promptOptions.map((option) => (
                   <option key={option.key} value={option.key}>
                     {option.label}
                   </option>
@@ -222,7 +266,7 @@ export function RegenerateBoard({
               {plan?.promptKey === "custom" ? (
                 <textarea
                   className="min-h-24 border border-[var(--line)] bg-transparent px-3 py-3 text-sm outline-none focus:border-[var(--text)] disabled:text-[var(--muted)]"
-                  placeholder="輸入自訂動作 prompt"
+                  placeholder={copy.customPlaceholder}
                   value={plan.customPrompt}
                   onChange={(event) =>
                     updatePlan(asset.id, { customPrompt: event.target.value })

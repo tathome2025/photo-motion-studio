@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { RegenerateBoard } from "@/components/regenerate-board";
 import { getProjectDetails } from "@/lib/data";
+import { getServerLocale } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ interface RegeneratePageProps {
 
 export default async function RegeneratePage({ params }: RegeneratePageProps) {
   const { projectId } = await params;
+  const locale = await getServerLocale();
   const project = await getProjectDetails(projectId);
 
   if (!project) {
@@ -34,23 +36,25 @@ export default async function RegeneratePage({ params }: RegeneratePageProps) {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="grid gap-3">
             <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-              Regenerate suite
+              {locale === "en" ? "Regenerate suite" : "重新生成頁"}
             </p>
             <h1 className="text-4xl tracking-[-0.05em]">{project.name}</h1>
             <p className="max-w-2xl text-sm leading-7 text-[var(--muted)]">
-              在這裡一次過看到所有縮圖，再逐張勾選與設定重新生成動作。
+              {locale === "en"
+                ? "Review every thumbnail in one place, then choose which clips to regenerate and set an action for each one."
+                : "在這裡一次過看到所有縮圖，再逐張勾選與設定重新生成動作。"}
             </p>
           </div>
           <Link
             href={`/projects/${projectId}/edit`}
             className="inline-flex h-10 items-center justify-center border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
           >
-            返回剪輯頁
+            {locale === "en" ? "Back to edit" : "返回剪輯頁"}
           </Link>
         </div>
       </section>
 
-      <RegenerateBoard projectId={projectId} initialAssets={project.assets} />
+      <RegenerateBoard projectId={projectId} initialAssets={project.assets} locale={locale} />
     </main>
   );
 }

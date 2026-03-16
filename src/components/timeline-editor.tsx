@@ -23,16 +23,21 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { GripVertical, Trash2 } from "lucide-react";
 
 import {
-  FRAME_STYLE_OPTIONS,
   MAX_REGENERATION_COUNT,
   THEME_OPTIONS,
-  TRANSITION_OPTIONS,
 } from "@/lib/constants";
+import {
+  getFrameStyleOptions,
+  getThemeOptions,
+  getTransitionOptions,
+  type Locale,
+} from "@/lib/i18n";
 import type { ProjectAsset, TimelineUpdateItem } from "@/lib/types";
 
 interface TimelineEditorProps {
   projectId: string;
   initialAssets: ProjectAsset[];
+  locale: Locale;
 }
 
 function toFfmpegColor(color: string) {
@@ -119,10 +124,12 @@ function SortableTimelineClip({
   asset,
   isSelected,
   onSelect,
+  locale,
 }: {
   asset: ProjectAsset;
   isSelected: boolean;
   onSelect: (assetId: string) => void;
+  locale: Locale;
 }) {
   const {
     attributes,
@@ -151,7 +158,7 @@ function SortableTimelineClip({
         onClick={() => onSelect(asset.id)}
       >
         <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">
-          <span>{asset.isStaticClip ? "static" : "video"}</span>
+          <span>{asset.isStaticClip ? (locale === "en" ? "still" : "靜態") : "video"}</span>
           <span>{asset.fileName}</span>
         </div>
         <div className="grid aspect-square w-[140px] place-items-center overflow-hidden border border-[var(--line)] bg-black">
@@ -178,7 +185,7 @@ function SortableTimelineClip({
           className="grid h-9 w-9 place-items-center border border-[var(--line)]"
           {...attributes}
           {...listeners}
-          aria-label={`排序 ${asset.fileName}`}
+          aria-label={locale === "en" ? `Sort ${asset.fileName}` : `排序 ${asset.fileName}`}
         >
           <GripVertical size={14} />
         </button>
@@ -193,15 +200,19 @@ async function parseApiResponse(response: Response) {
   try {
     return JSON.parse(rawText) as { error?: string; project?: { name: string }; assets?: ProjectAsset[] };
   } catch {
-    throw new Error(rawText || `請求失敗 (${response.status})`);
+    throw new Error(rawText || `Request failed (${response.status})`);
   }
 }
 
 export function TimelineEditor({
   projectId,
   initialAssets,
+  locale,
 }: TimelineEditorProps) {
   const sensors = useSensors(useSensor(PointerSensor));
+  const transitionOptions = getTransitionOptions(locale);
+  const themeOptions = getThemeOptions(locale);
+  const frameStyleOptions = getFrameStyleOptions(locale);
   const [assets, setAssets] = useState(initialAssets);
   const [selectedAssetId, setSelectedAssetId] = useState(initialAssets[0]?.id ?? null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -209,6 +220,78 @@ export function TimelineEditor({
   const [exporting, setExporting] = useState(false);
   const [isPending, startTransition] = useTransition();
   const ffmpegRef = useRef<FFmpeg | null>(null);
+  const copy =
+    locale === "en"
+      ? {
+          saved: "Timeline saved.",
+          sortedSaved: "Order saved automatically.",
+          saveFailed: "Failed to save timeline.",
+          deleteConfirm: "This clip cannot be restored after deletion. Continue?",
+          deleteFailed: "Failed to delete clip.",
+          deleted: "Clip deleted.",
+          preparingExport: "Preparing video export...",
+          exportLoadFailed: "Failed to load export data.",
+          clipNotReady: (name: string) => `Clip ${name} is not ready yet.`,
+          exported: "Video exported and downloaded.",
+          exportFailed: "Export failed.",
+          noClips: "There are no clips available for editing yet.",
+          title: "Horizontal timeline editing with large preview",
+          backHome: "Back home",
+          saving: "Saving...",
+          saveTimeline: "Save timeline",
+          exporting: "Exporting...",
+          exportVideo: "Export video",
+          preview: "Preview",
+          selectedClip: "Selected clip",
+          regenerationCount: (count: number) =>
+            `Regeneration count ${count}/${MAX_REGENERATION_COUNT}`,
+          transition: "Transition",
+          theme: "Theme",
+          frame: "Frame",
+          regenerateTitle: "Go to the separate regenerate page",
+          regenerateDescription:
+            "Regeneration opens a separate page that shows all thumbnails at once, so you can select clips and assign actions one by one.",
+          openRegenerate: "Open regenerate page",
+          deletePhoto: "Delete photo",
+          horizontalTimeline: "Horizontal timeline",
+          reorder: "Drag thumbnails to reorder",
+          clips: (count: number) => `${count} clips`,
+        }
+      : {
+          saved: "時間線已儲存。",
+          sortedSaved: "排序已自動儲存。",
+          saveFailed: "儲存時間線失敗。",
+          deleteConfirm: "刪除此片段後不能還原，是否繼續？",
+          deleteFailed: "刪除片段失敗。",
+          deleted: "片段已刪除。",
+          preparingExport: "準備影片匯出中...",
+          exportLoadFailed: "載入匯出資料失敗。",
+          clipNotReady: (name: string) => `片段 ${name} 尚未完成生成。`,
+          exported: "影片已匯出並下載到電腦。",
+          exportFailed: "匯出失敗。",
+          noClips: "目前沒有可剪輯片段。",
+          title: "橫向時間線排序與大 preview 剪輯",
+          backHome: "返回首頁",
+          saving: "儲存中...",
+          saveTimeline: "儲存時間線",
+          exporting: "輸出中...",
+          exportVideo: "輸出影片",
+          preview: "Preview",
+          selectedClip: "Selected clip",
+          regenerationCount: (count: number) =>
+            `重新生成次數 ${count}/${MAX_REGENERATION_COUNT}`,
+          transition: "Transition",
+          theme: "Theme",
+          frame: "Frame",
+          regenerateTitle: "前往獨立頁面重新生成",
+          regenerateDescription:
+            "重新生成會打開獨立頁面，一次過顯示所有縮圖，再逐張勾選並設定生成動作。",
+          openRegenerate: "打開重新生成頁面",
+          deletePhoto: "刪除相片",
+          horizontalTimeline: "Horizontal timeline",
+          reorder: "拖動縮圖重新排序",
+          clips: (count: number) => `${count} clips`,
+        };
 
   useEffect(() => {
     if (!selectedAssetId && assets[0]) {
@@ -226,7 +309,7 @@ export function TimelineEditor({
 
   const orderedIds = useMemo(() => assets.map((asset) => asset.id), [assets]);
 
-  function persistTimeline(nextAssets: ProjectAsset[], successMessage = "時間線已儲存。") {
+  function persistTimeline(nextAssets: ProjectAsset[], successMessage = copy.saved) {
     setError(null);
     setStatusMessage(null);
 
@@ -250,7 +333,7 @@ export function TimelineEditor({
       const data = await parseApiResponse(response);
 
       if (!response.ok) {
-        setError(data.error ?? "儲存時間線失敗。");
+        setError(data.error ?? copy.saveFailed);
         return;
       }
 
@@ -269,7 +352,7 @@ export function TimelineEditor({
     const newIndex = assets.findIndex((asset) => asset.id === over.id);
     const nextAssets = arrayMove(assets, oldIndex, newIndex);
     setAssets(nextAssets);
-    persistTimeline(nextAssets, "排序已自動儲存。");
+    persistTimeline(nextAssets, copy.sortedSaved);
   }
 
   function handleSelectedFieldChange(
@@ -301,7 +384,7 @@ export function TimelineEditor({
       return;
     }
 
-    const confirmed = window.confirm("刪除此片段後不能還原，是否繼續？");
+    const confirmed = window.confirm(copy.deleteConfirm);
 
     if (!confirmed) {
       return;
@@ -314,18 +397,18 @@ export function TimelineEditor({
     const data = await parseApiResponse(response);
 
     if (!response.ok) {
-      setError(data.error ?? "刪除片段失敗。");
+      setError(data.error ?? copy.deleteFailed);
       return;
     }
 
     setAssets((current) => current.filter((asset) => asset.id !== selectedAsset.id));
-    setStatusMessage("片段已刪除。");
+    setStatusMessage(copy.deleted);
   }
 
   async function exportVideo() {
     setExporting(true);
     setError(null);
-    setStatusMessage("準備影片匯出中...");
+    setStatusMessage(copy.preparingExport);
 
     try {
       const response = await fetch(`/api/projects/${projectId}/render`, {
@@ -334,7 +417,7 @@ export function TimelineEditor({
       const data = await parseApiResponse(response);
 
       if (!response.ok) {
-        throw new Error(data.error ?? "載入匯出資料失敗。");
+        throw new Error(data.error ?? copy.exportLoadFailed);
       }
 
       if (!ffmpegRef.current) {
@@ -371,7 +454,7 @@ export function TimelineEditor({
         }
 
         if (!asset.generatedUrl) {
-          throw new Error(`片段 ${asset.fileName} 尚未完成生成。`);
+          throw new Error(copy.clipNotReady(asset.fileName));
         }
 
         await ffmpeg.writeFile(`clip-${index}.mp4`, await fetchFile(asset.generatedUrl));
@@ -407,9 +490,9 @@ export function TimelineEditor({
       anchor.download = `${data.project?.name ?? "motioncut"}-final-cut.mp4`;
       anchor.click();
       URL.revokeObjectURL(url);
-      setStatusMessage("影片已匯出並下載到電腦。");
+      setStatusMessage(copy.exported);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "匯出失敗。");
+      setError(reason instanceof Error ? reason.message : copy.exportFailed);
     } finally {
       setExporting(false);
     }
@@ -418,7 +501,7 @@ export function TimelineEditor({
   if (!selectedAsset) {
     return (
       <div className="grid min-h-80 place-items-center border border-dashed border-[var(--line)] text-sm text-[var(--muted)]">
-        目前沒有可剪輯片段。
+        {copy.noClips}
       </div>
     );
   }
@@ -435,7 +518,7 @@ export function TimelineEditor({
               Timeline
             </p>
             <h2 className="text-3xl tracking-tight">
-              橫向時間線排序與大 preview 剪輯
+              {copy.title}
             </h2>
           </div>
 
@@ -444,7 +527,7 @@ export function TimelineEditor({
               href="/"
               className="inline-flex h-12 items-center justify-center border border-[var(--line)] px-5 text-sm uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
             >
-              返回首頁
+              {copy.backHome}
             </Link>
             <button
               type="button"
@@ -452,7 +535,7 @@ export function TimelineEditor({
               onClick={saveTimelineEdits}
               disabled={isPending}
             >
-              {isPending ? "儲存中..." : "儲存時間線"}
+              {isPending ? copy.saving : copy.saveTimeline}
             </button>
             <button
               type="button"
@@ -460,7 +543,7 @@ export function TimelineEditor({
               onClick={exportVideo}
               disabled={exporting}
             >
-              {exporting ? "輸出中..." : "輸出影片"}
+              {exporting ? copy.exporting : copy.exportVideo}
             </button>
           </div>
         </div>
@@ -469,7 +552,7 @@ export function TimelineEditor({
       <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="grid gap-4 border border-[var(--line)] p-5">
           <div className="flex items-center justify-between text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
-            <span>Preview</span>
+            <span>{copy.preview}</span>
             <span>{selectedAsset.fileName}</span>
           </div>
           <div
@@ -499,17 +582,17 @@ export function TimelineEditor({
         <div className="grid gap-4 border border-[var(--line)] p-5">
           <div className="grid gap-2">
             <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-              Selected clip
+              {copy.selectedClip}
             </p>
             <h3 className="text-2xl tracking-tight">{selectedAsset.fileName}</h3>
             <p className="text-sm leading-6 text-[var(--muted)]">
-              重新生成次數 {selectedAsset.regenerationCount}/{MAX_REGENERATION_COUNT}
+              {copy.regenerationCount(selectedAsset.regenerationCount)}
             </p>
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
             <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              Transition
+              {copy.transition}
               <select
                 className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
                 value={selectedAsset.transitionKey}
@@ -517,7 +600,7 @@ export function TimelineEditor({
                   handleSelectedFieldChange("transitionKey", event.target.value)
                 }
               >
-                {TRANSITION_OPTIONS.map((option) => (
+                {transitionOptions.map((option) => (
                   <option key={option.key} value={option.key}>
                     {option.label}
                   </option>
@@ -525,7 +608,7 @@ export function TimelineEditor({
               </select>
             </label>
             <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              Theme
+              {copy.theme}
               <select
                 className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
                 value={selectedAsset.themeKey}
@@ -533,7 +616,7 @@ export function TimelineEditor({
                   handleSelectedFieldChange("themeKey", event.target.value)
                 }
               >
-                {THEME_OPTIONS.map((option) => (
+                {themeOptions.map((option) => (
                   <option key={option.key} value={option.key}>
                     {option.label}
                   </option>
@@ -541,7 +624,7 @@ export function TimelineEditor({
               </select>
             </label>
             <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              Frame
+              {copy.frame}
               <select
                 className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
                 value={selectedAsset.frameStyleKey}
@@ -549,7 +632,7 @@ export function TimelineEditor({
                   handleSelectedFieldChange("frameStyleKey", event.target.value)
                 }
               >
-                {FRAME_STYLE_OPTIONS.map((option) => (
+                {frameStyleOptions.map((option) => (
                   <option key={option.key} value={option.key}>
                     {option.label}
                   </option>
@@ -564,20 +647,20 @@ export function TimelineEditor({
                 <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
                   Regenerate
                 </p>
-                <h4 className="text-lg tracking-tight">前往獨立頁面重新生成</h4>
+                <h4 className="text-lg tracking-tight">{copy.regenerateTitle}</h4>
               </div>
               <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
                 max {MAX_REGENERATION_COUNT}
               </div>
             </div>
             <p className="text-sm leading-6 text-[var(--muted)]">
-              重新生成會打開獨立頁面，一次過顯示所有縮圖，再逐張勾選並設定生成動作。
+              {copy.regenerateDescription}
             </p>
             <Link
               href={`/projects/${projectId}/regenerate`}
               className="inline-flex h-10 items-center justify-center border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
             >
-              打開重新生成頁面
+              {copy.openRegenerate}
             </Link>
           </div>
 
@@ -588,7 +671,7 @@ export function TimelineEditor({
               onClick={deleteClip}
             >
               <Trash2 size={15} />
-              刪除相片
+              {copy.deletePhoto}
             </button>
           </div>
         </div>
@@ -598,11 +681,11 @@ export function TimelineEditor({
         <div className="flex items-end justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-              Horizontal timeline
+              {copy.horizontalTimeline}
             </p>
-            <h3 className="text-2xl tracking-tight">拖動縮圖重新排序</h3>
+            <h3 className="text-2xl tracking-tight">{copy.reorder}</h3>
           </div>
-          <div className="text-sm text-[var(--muted)]">{assets.length} clips</div>
+          <div className="text-sm text-[var(--muted)]">{copy.clips(assets.length)}</div>
         </div>
 
         <div className="overflow-x-auto">
@@ -619,6 +702,7 @@ export function TimelineEditor({
                     asset={asset}
                     isSelected={asset.id === selectedAsset.id}
                     onSelect={setSelectedAssetId}
+                    locale={locale}
                   />
                 ))}
               </div>

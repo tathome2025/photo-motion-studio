@@ -1,14 +1,15 @@
 import { clsx, type ClassValue } from "clsx";
 
 import { PROMPT_OPTIONS } from "@/lib/constants";
+import { getDateTimeLocale, type Locale } from "@/lib/i18n";
 import type { PromptKey } from "@/lib/types";
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
 }
 
-export function formatDate(input: string) {
-  return new Intl.DateTimeFormat("zh-HK", {
+export function formatDate(input: string, locale: Locale = "zh") {
+  return new Intl.DateTimeFormat(getDateTimeLocale(locale), {
     year: "numeric",
     month: "short",
     day: "numeric",

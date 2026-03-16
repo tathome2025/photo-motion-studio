@@ -4,6 +4,7 @@ import { DeleteProjectButton } from "@/components/delete-project-button";
 import { EditUploadPanel } from "@/components/edit-upload-panel";
 import { TimelineEditor } from "@/components/timeline-editor";
 import { getProjectDetails } from "@/lib/data";
+import { getServerLocale } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ interface EditPageProps {
 
 export default async function EditPage({ params }: EditPageProps) {
   const { projectId } = await params;
+  const locale = await getServerLocale();
   const project = await getProjectDetails(projectId);
 
   if (!project) {
@@ -35,23 +37,26 @@ export default async function EditPage({ params }: EditPageProps) {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="grid gap-3">
             <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-              Edit suite
+              {locale === "en" ? "Edit suite" : "剪輯頁"}
             </p>
             <h1 className="text-4xl tracking-[-0.05em]">{project.name}</h1>
             <p className="max-w-2xl text-sm leading-7 text-[var(--muted)]">
-              所有已完成的動態片段都已放進時間線。你可以橫向排序，選擇大 preview 片段，再設定過場與版面風格。
+              {locale === "en"
+                ? "Completed motion clips are already placed on the timeline. Reorder them horizontally, preview a selected clip, then adjust transitions and visual styling."
+                : "所有已完成的動態片段都已放進時間線。你可以橫向排序，選擇大 preview 片段，再設定過場與版面風格。"}
             </p>
           </div>
-          <DeleteProjectButton projectId={projectId} />
+          <DeleteProjectButton projectId={projectId} locale={locale} />
         </div>
       </section>
 
       <EditUploadPanel
         projectId={projectId}
         currentAssetCount={project.assetCount}
+        locale={locale}
       />
 
-      <TimelineEditor projectId={projectId} initialAssets={project.assets} />
+      <TimelineEditor projectId={projectId} initialAssets={project.assets} locale={locale} />
     </main>
   );
 }

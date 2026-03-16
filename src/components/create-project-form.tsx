@@ -3,15 +3,37 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import type { Locale } from "@/lib/i18n";
+
 interface CreateProjectFormProps {
   compact?: boolean;
+  locale: Locale;
 }
 
-export function CreateProjectForm({ compact = false }: CreateProjectFormProps) {
+export function CreateProjectForm({
+  compact = false,
+  locale,
+}: CreateProjectFormProps) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const copy =
+    locale === "en"
+      ? {
+          label: "New Project Name",
+          placeholder: "Example: Family Portrait Cut",
+          creating: "Creating...",
+          create: "Create project",
+          error: "Failed to create project.",
+        }
+      : {
+          label: "New Project Name",
+          placeholder: "例如：Family Portrait Cut",
+          creating: "建立中...",
+          create: "新增專案",
+          error: "建立專案失敗。",
+        };
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,7 +51,7 @@ export function CreateProjectForm({ compact = false }: CreateProjectFormProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error ?? "建立專案失敗。");
+        setError(data.error ?? copy.error);
         return;
       }
 
@@ -45,13 +67,13 @@ export function CreateProjectForm({ compact = false }: CreateProjectFormProps) {
     >
       <div className="space-y-2">
         <label className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-          New Project Name
+          {copy.label}
         </label>
         <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
           <input
             required
             className="h-12 border border-[var(--line)] bg-transparent px-4 text-sm outline-none transition focus:border-[var(--text)]"
-            placeholder="例如：Family Portrait Cut"
+            placeholder={copy.placeholder}
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -60,7 +82,7 @@ export function CreateProjectForm({ compact = false }: CreateProjectFormProps) {
             className="inline-flex h-12 items-center justify-center border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
             disabled={isPending}
           >
-            {isPending ? "建立中..." : "新增專案"}
+            {isPending ? copy.creating : copy.create}
           </button>
         </div>
       </div>

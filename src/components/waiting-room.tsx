@@ -4,16 +4,20 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { getDateTimeLocale, type Locale } from "@/lib/i18n";
+
 interface WaitingRoomProps {
   projectId: string;
   initialTotal: number;
   initialCompleted: number;
+  locale: Locale;
 }
 
 export function WaitingRoom({
   projectId,
   initialTotal,
   initialCompleted,
+  locale,
 }: WaitingRoomProps) {
   const router = useRouter();
   const [counts, setCounts] = useState({
@@ -24,6 +28,46 @@ export function WaitingRoom({
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [readyTriggered, setReadyTriggered] = useState(false);
+  const copy =
+    locale === "en"
+      ? {
+          syncError: "Failed to sync.",
+          title: "Waiting for all motion clips to finish",
+          description:
+            "Motion clips are in the processing queue. Progress is checked automatically. You can leave this page, open other projects, and return later to continue editing.",
+          checking: "checking",
+          standby: "standby",
+          lastCheck: "last check",
+          completed: "completed",
+          remaining: "remaining",
+          queue: "Processing queue",
+          queueTitle: "Clips in progress",
+          autoUpdating: "auto-updating",
+          done: "done",
+          processing: "processing",
+          back: "Back to projects",
+          checkNow: "Check now",
+          notificationBody: "All motion clips are ready. You can start editing now.",
+        }
+      : {
+          syncError: "同步失敗。",
+          title: "正在等待所有動態相片完成",
+          description:
+            "動態影像已進入處理佇列，系統會自動檢查最新進度。你可以離開此頁建立其他專案，之後再回來繼續剪輯。",
+          checking: "檢查中",
+          standby: "待命中",
+          lastCheck: "上次檢查",
+          completed: "已完成",
+          remaining: "待完成",
+          queue: "處理佇列",
+          queueTitle: "片段處理中",
+          autoUpdating: "自動更新中...",
+          done: "完成",
+          processing: "處理中",
+          back: "返回專案首頁",
+          checkNow: "立即檢查",
+          notificationBody: "所有動態相片已完成，可以開始剪輯。",
+        };
 
   useEffect(() => {
     let isCancelled = false;
@@ -42,7 +86,7 @@ export function WaitingRoom({
 
         if (!response.ok) {
           if (!isCancelled) {
-            setError(data.error ?? "同步失敗。");
+            setError(data.error ?? copy.syncError);
           }
           return;
         }
@@ -53,7 +97,7 @@ export function WaitingRoom({
 
         setError(null);
         setLastCheckedAt(
-          new Intl.DateTimeFormat("zh-HK", {
+          new Intl.DateTimeFormat(getDateTimeLocale(locale), {
             hour: "2-digit",
             minute: "2-digit",
             second: "2-digit",
@@ -75,7 +119,7 @@ export function WaitingRoom({
             !readyTriggered
           ) {
             new Notification("MotionCut Studio", {
-              body: "所有動態相片已完成，可以開始剪輯。",
+              body: copy.notificationBody,
             });
           }
 
@@ -85,7 +129,7 @@ export function WaitingRoom({
         }
       } catch (reason) {
         if (!isCancelled) {
-          setError(reason instanceof Error ? reason.message : "同步失敗。");
+          setError(reason instanceof Error ? reason.message : copy.syncError);
         }
       } finally {
         if (!isCancelled) {
@@ -109,7 +153,7 @@ export function WaitingRoom({
       isCancelled = true;
       window.clearInterval(interval);
     };
-  }, [projectId, readyTriggered, router]);
+  }, [copy.notificationBody, copy.syncError, locale, projectId, readyTriggered, router]);
 
   const progress = counts.total === 0 ? 0 : (counts.completed / counts.total) * 100;
   const remaining = Math.max(counts.total - counts.completed, 0);
@@ -122,9 +166,9 @@ export function WaitingRoom({
           <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
             Waiting room
           </p>
-          <h2 className="text-3xl tracking-tight">正在等待所有動態相片完成</h2>
+          <h2 className="text-3xl tracking-tight">{copy.title}</h2>
           <p className="max-w-2xl text-sm leading-6 text-[var(--muted)]">
-            動態影像已進入處理佇列，系統會自動檢查最新進度。你可以離開此頁建立其他專案，之後再回來繼續剪輯。
+            {copy.description}
           </p>
           <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
             <span className="inline-flex items-center gap-2 border border-[var(--line)] px-3 py-2">
@@ -133,9 +177,9 @@ export function WaitingRoom({
                   isSyncing ? "animate-status-pulse bg-[var(--text)]" : "bg-transparent"
                 }`}
               />
-              {isSyncing ? "checking" : "standby"}
+              {isSyncing ? copy.checking : copy.standby}
             </span>
-            {lastCheckedAt ? <span>last check {lastCheckedAt}</span> : null}
+            {lastCheckedAt ? <span>{copy.lastCheck} {lastCheckedAt}</span> : null}
           </div>
         </div>
 
@@ -156,8 +200,8 @@ export function WaitingRoom({
             {counts.completed}/{counts.total}
           </div>
           <div className="text-right text-sm text-[var(--muted)]">
-            <div>completed</div>
-            <div>{remaining} remaining</div>
+            <div>{copy.completed}</div>
+            <div>{remaining} {copy.remaining}</div>
           </div>
         </div>
         <div className="relative h-3 overflow-hidden border border-[var(--line)] bg-[var(--surface)]">
@@ -173,11 +217,11 @@ export function WaitingRoom({
         <div className="flex items-end justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-              Processing queue
+              {copy.queue}
             </p>
-            <h3 className="text-xl tracking-tight">片段處理中</h3>
+            <h3 className="text-xl tracking-tight">{copy.queueTitle}</h3>
           </div>
-          <div className="text-sm text-[var(--muted)]">自動更新中...</div>
+          <div className="text-sm text-[var(--muted)]">{copy.autoUpdating}</div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -188,7 +232,7 @@ export function WaitingRoom({
             >
               <div className="flex items-center justify-between text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
                 <span>Clip {String(index + 1).padStart(2, "0")}</span>
-                <span>{index < counts.completed ? "done" : "processing"}</span>
+                <span>{index < counts.completed ? copy.done : copy.processing}</span>
               </div>
               <div className="relative min-h-40 overflow-hidden border border-[var(--line)] bg-[var(--surface-soft)]">
                 <div className="absolute inset-0 queue-card-scan" />
@@ -206,14 +250,14 @@ export function WaitingRoom({
           href="/"
           className="inline-flex h-12 items-center justify-center border border-[var(--line)] px-5 text-sm uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
         >
-          返回專案首頁
+          {copy.back}
         </Link>
         <button
           type="button"
           className="h-12 border border-[var(--text)] px-5 text-sm uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)]"
           onClick={() => router.refresh()}
         >
-          立即檢查
+          {copy.checkNow}
         </button>
       </div>
 

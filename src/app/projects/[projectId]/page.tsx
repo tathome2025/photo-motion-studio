@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { DeleteProjectButton } from "@/components/delete-project-button";
 import { UploadPromptBoard } from "@/components/upload-prompt-board";
 import { getProjectDetails } from "@/lib/data";
+import { getServerLocale } from "@/lib/i18n-server";
 import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ interface ProjectPageProps {
 
 export default async function ProjectPage({ params }: ProjectPageProps) {
   const { projectId } = await params;
+  const locale = await getServerLocale();
   const project = await getProjectDetails(projectId);
 
   if (!project) {
@@ -36,7 +38,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
-              Project setup
+              {locale === "en" ? "Project setup" : "專案設定"}
             </p>
             <h1 className="text-4xl tracking-[-0.05em]">{project.name}</h1>
           </div>
@@ -45,19 +47,28 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               href="/"
               className="inline-flex h-12 items-center justify-center border border-[var(--line)] px-5 text-sm uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
             >
-              返回首頁
+              {locale === "en" ? "Back home" : "返回首頁"}
             </Link>
-            <DeleteProjectButton projectId={projectId} />
+            <DeleteProjectButton projectId={projectId} locale={locale} />
           </div>
         </div>
         <div className="grid gap-3 border-t border-[var(--line)] pt-4 text-sm text-[var(--muted)] md:grid-cols-3">
-          <div>建立時間：<span className="text-[var(--text)]">{formatDate(project.createdAt)}</span></div>
-          <div>現有相片：<span className="text-[var(--text)]">{project.assetCount}</span></div>
-          <div>已完成動態：<span className="text-[var(--text)]">{project.completedCount}</span></div>
+          <div>
+            {locale === "en" ? "Created:" : "建立時間："}
+            <span className="text-[var(--text)]">{formatDate(project.createdAt, locale)}</span>
+          </div>
+          <div>
+            {locale === "en" ? "Photos:" : "現有相片："}
+            <span className="text-[var(--text)]">{project.assetCount}</span>
+          </div>
+          <div>
+            {locale === "en" ? "Completed clips:" : "已完成動態："}
+            <span className="text-[var(--text)]">{project.completedCount}</span>
+          </div>
         </div>
       </section>
 
-      <UploadPromptBoard projectId={projectId} initialAssets={project.assets} />
+      <UploadPromptBoard projectId={projectId} initialAssets={project.assets} locale={locale} />
     </main>
   );
 }
