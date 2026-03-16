@@ -16,7 +16,7 @@ export type Locale = "zh" | "en";
 export const LOCALE_COOKIE_NAME = "motioncut_locale";
 
 export function normalizeLocale(value: string | null | undefined): Locale {
-  return value === "en" ? "en" : "zh";
+  return value === "zh" ? "zh" : "en";
 }
 
 export function getLocaleLabel(locale: Locale) {
