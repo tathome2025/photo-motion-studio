@@ -20,13 +20,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { GripVertical, Trash2 } from "lucide-react";
 
-import { MAX_REGENERATION_COUNT, THEME_OPTIONS } from "@/lib/constants";
-import {
-  getFrameStyleOptions,
-  getThemeOptions,
-  getTransitionOptions,
-  type Locale,
-} from "@/lib/i18n";
+import { MAX_REGENERATION_COUNT } from "@/lib/constants";
+import { type Locale } from "@/lib/i18n";
 import type { ProjectAsset, TimelineUpdateItem } from "@/lib/types";
 
 interface TimelineEditorProps {
@@ -119,9 +114,6 @@ async function parseApiResponse(response: Response) {
 
 export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEditorProps) {
   const sensors = useSensors(useSensor(PointerSensor));
-  const transitionOptions = getTransitionOptions(locale);
-  const themeOptions = getThemeOptions(locale);
-  const frameStyleOptions = getFrameStyleOptions(locale);
   const [assets, setAssets] = useState(initialAssets);
   const [selectedAssetId, setSelectedAssetId] = useState(initialAssets[0]?.id ?? null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -146,9 +138,6 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           selectedClip: "Selected clip",
           regenerationCount: (count: number) =>
             `Regeneration count ${count}/${MAX_REGENERATION_COUNT}`,
-          transition: "Transition",
-          theme: "Theme",
-          frame: "Frame",
           regenerateTitle: "Go to the separate regenerate page",
           regenerateDescription:
             "Regeneration opens a separate page that shows all thumbnails at once, so you can select clips and assign actions one by one.",
@@ -175,9 +164,6 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           selectedClip: "Selected clip",
           regenerationCount: (count: number) =>
             `重新生成次數 ${count}/${MAX_REGENERATION_COUNT}`,
-          transition: "Transition",
-          theme: "Theme",
-          frame: "Frame",
           regenerateTitle: "前往獨立頁面重新生成",
           regenerateDescription:
             "重新生成會打開獨立頁面，一次過顯示所有縮圖，再逐張勾選並設定生成動作。",
@@ -248,26 +234,6 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
     persistTimeline(nextAssets, copy.sortedSaved);
   }
 
-  function handleSelectedFieldChange(
-    field: "transitionKey" | "themeKey" | "frameStyleKey",
-    value: string,
-  ) {
-    if (!selectedAsset) {
-      return;
-    }
-
-    setAssets((current) =>
-      current.map((asset) =>
-        asset.id === selectedAsset.id
-          ? {
-              ...asset,
-              [field]: value,
-            }
-          : asset,
-      ),
-    );
-  }
-
   function saveTimelineEdits() {
     persistTimeline(assets);
   }
@@ -305,9 +271,6 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
       </div>
     );
   }
-
-  const selectedTheme =
-    THEME_OPTIONS.find((item) => item.key === selectedAsset.themeKey) ?? THEME_OPTIONS[0];
 
   return (
     <div className="grid gap-8">
@@ -351,11 +314,7 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           </div>
           <div
             className="grid min-h-[420px] place-items-center border p-5"
-            style={{
-              borderColor: selectedTheme.border,
-              backgroundColor: selectedTheme.background,
-              color: selectedTheme.text,
-            }}
+            style={{ borderColor: "var(--line)", backgroundColor: "var(--surface-soft)" }}
           >
             {selectedAsset.isStaticClip ? (
               <img
@@ -382,55 +341,6 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
             <p className="text-sm leading-6 text-[var(--muted)]">
               {copy.regenerationCount(selectedAsset.regenerationCount)}
             </p>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-3">
-            <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              {copy.transition}
-              <select
-                className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
-                value={selectedAsset.transitionKey}
-                onChange={(event) =>
-                  handleSelectedFieldChange("transitionKey", event.target.value)
-                }
-              >
-                {transitionOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              {copy.theme}
-              <select
-                className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
-                value={selectedAsset.themeKey}
-                onChange={(event) => handleSelectedFieldChange("themeKey", event.target.value)}
-              >
-                {themeOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              {copy.frame}
-              <select
-                className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
-                value={selectedAsset.frameStyleKey}
-                onChange={(event) =>
-                  handleSelectedFieldChange("frameStyleKey", event.target.value)
-                }
-              >
-                {frameStyleOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
 
           <div className="grid gap-3 border border-[var(--line)] bg-[var(--surface-soft)] p-4">

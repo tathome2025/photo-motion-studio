@@ -8,7 +8,14 @@ import {
 } from "@/lib/data";
 
 const payloadSchema = z.object({
-  templateKey: z.enum(["clean-cut", "magazine", "spotlight", "cinematic"]),
+  templateKey: z.enum([
+    "clean-cut",
+    "magazine",
+    "spotlight",
+    "cinematic",
+    "ocean-drift",
+    "night-pulse",
+  ]),
   musicKey: z
     .enum([
       "track-01",

@@ -6,13 +6,18 @@ import { useEffect, useMemo, useState } from "react";
 import { MUSIC_TRACK_OPTIONS } from "@/lib/constants";
 import { renderVideoPreview } from "@/lib/client-render";
 import type { Locale } from "@/lib/i18n";
-import type { ProjectAsset, ProjectTemplateConfig } from "@/lib/types";
+import type {
+  ProjectAsset,
+  ProjectTemplateConfig,
+  StudioTemplatePreset,
+} from "@/lib/types";
 
 interface RenderPreviewPanelProps {
   projectId: string;
   projectName: string;
   assets: ProjectAsset[];
   templateConfig: ProjectTemplateConfig;
+  templatePreset: StudioTemplatePreset;
   locale: Locale;
 }
 
@@ -21,6 +26,7 @@ export function RenderPreviewPanel({
   projectName,
   assets,
   templateConfig,
+  templatePreset,
   locale,
 }: RenderPreviewPanelProps) {
   const [isRendering, setIsRendering] = useState(false);
@@ -36,7 +42,7 @@ export function RenderPreviewPanel({
       ? {
           title: "Rendered preview",
           description:
-            "The full video is rendered in your browser with the selected template and music. Review it before download.",
+            "The full video is rendered in your browser using 2.5s clips over a 1920x1080 theme background with music and black fade in/out.",
           backSetup: "Back to template setup",
           rerender: "Render again",
           rendering: "Rendering video...",
@@ -50,7 +56,7 @@ export function RenderPreviewPanel({
       : {
           title: "渲染預覽",
           description:
-            "系統會用你選擇的模板與音樂，在瀏覽器內完成完整影片渲染。確認無誤後即可下載。",
+            "系統會把每段片段統一成 2.5 秒，疊在 1920x1080 主題背景上，再加音樂及黑場淡入淡出完成渲染。",
           backSetup: "返回模板設定",
           rerender: "重新渲染",
           rendering: "影片渲染中...",
@@ -84,11 +90,7 @@ export function RenderPreviewPanel({
       try {
         const blob = await renderVideoPreview({
           assets: playableAssets,
-          settings: {
-            transitionKey: templateConfig.defaultTransitionKey,
-            themeKey: templateConfig.defaultThemeKey,
-            frameStyleKey: templateConfig.defaultFrameStyleKey,
-          },
+          backgroundVideoPath: templatePreset.backgroundVideoPath,
           musicFilePath: musicTrack?.filePath ?? null,
         });
 
@@ -123,9 +125,7 @@ export function RenderPreviewPanel({
     copy.failed,
     musicTrack?.filePath,
     playableAssets,
-    templateConfig.defaultFrameStyleKey,
-    templateConfig.defaultThemeKey,
-    templateConfig.defaultTransitionKey,
+    templatePreset.backgroundVideoPath,
   ]);
 
   function downloadVideo() {
@@ -150,11 +150,7 @@ export function RenderPreviewPanel({
     try {
       const blob = await renderVideoPreview({
         assets: playableAssets,
-        settings: {
-          transitionKey: templateConfig.defaultTransitionKey,
-          themeKey: templateConfig.defaultThemeKey,
-          frameStyleKey: templateConfig.defaultFrameStyleKey,
-        },
+        backgroundVideoPath: templatePreset.backgroundVideoPath,
         musicFilePath: musicTrack?.filePath ?? null,
       });
 

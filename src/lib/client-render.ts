@@ -3,90 +3,16 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile } from "@ffmpeg/util";
 
-import { THEME_OPTIONS } from "@/lib/constants";
-import type { FrameStyleKey, ProjectAsset, ThemeKey, TransitionKey } from "@/lib/types";
+import type { ProjectAsset } from "@/lib/types";
+
+const CONTENT_WIDTH = 1344;
+const CONTENT_HEIGHT = 756;
+const BACKGROUND_WIDTH = 1920;
+const BACKGROUND_HEIGHT = 1080;
+const CLIP_DURATION_SECONDS = 2.5;
+const FADE_SECONDS = 0.6;
 
 let ffmpegInstance: FFmpeg | null = null;
-
-function toFfmpegColor(color: string) {
-  return color.replace("#", "0x");
-}
-
-function getTransitionFilter(transition: ProjectAsset["transitionKey"]) {
-  switch (transition) {
-    case "wipeleft":
-      return { filter: "wipeleft", duration: 0.55 };
-    case "slideup":
-      return { filter: "slideup", duration: 0.55 };
-    case "cut":
-      return { filter: "fade", duration: 0.05 };
-    case "fade":
-    default:
-      return { filter: "fade", duration: 0.55 };
-  }
-}
-
-function buildFrameFilters(frameStyle: ProjectAsset["frameStyleKey"], border: string) {
-  if (frameStyle === "none") {
-    return [];
-  }
-
-  if (frameStyle === "single") {
-    return [`drawbox=x=28:y=28:w=iw-56:h=ih-56:color=${border}:t=4`];
-  }
-
-  if (frameStyle === "double") {
-    return [
-      `drawbox=x=20:y=20:w=iw-40:h=ih-40:color=${border}:t=3`,
-      `drawbox=x=34:y=34:w=iw-68:h=ih-68:color=${border}:t=2`,
-    ];
-  }
-
-  return [
-    `drawbox=x=28:y=28:w=iw-56:h=ih-56:color=${border}:t=4`,
-    `drawbox=x=46:y=46:w=iw-92:h=ih-92:color=${border}@0.75:t=2`,
-  ];
-}
-
-function buildFilterGraph(assets: ProjectAsset[]) {
-  const filters: string[] = [];
-
-  assets.forEach((asset, index) => {
-    const theme = THEME_OPTIONS.find((item) => item.key === asset.themeKey) ?? THEME_OPTIONS[0];
-    const base = [
-      `[${index}:v]fps=30,scale=1280:720:force_original_aspect_ratio=decrease`,
-      `pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=${toFfmpegColor(theme.background)}`,
-      "setsar=1",
-      ...buildFrameFilters(asset.frameStyleKey, toFfmpegColor(theme.border)),
-      `format=yuv420p,setpts=PTS-STARTPTS[v${index}]`,
-    ];
-
-    filters.push(base.join(","));
-  });
-
-  if (assets.length === 1) {
-    return { filter: filters.join(";"), outputLabel: "v0" };
-  }
-
-  let currentLabel = "v0";
-  let currentDuration = assets[0].durationSeconds;
-
-  for (let index = 1; index < assets.length; index += 1) {
-    const transition = getTransitionFilter(assets[index - 1].transitionKey);
-    const nextLabel = `vx${index}`;
-    const offset = Math.max(currentDuration - transition.duration, 0);
-
-    filters.push(
-      `[${currentLabel}][v${index}]xfade=transition=${transition.filter}:duration=${transition.duration}:offset=${offset}[${nextLabel}]`,
-    );
-
-    currentLabel = nextLabel;
-    currentDuration =
-      currentDuration + assets[index].durationSeconds - transition.duration;
-  }
-
-  return { filter: filters.join(";"), outputLabel: currentLabel };
-}
 
 async function ensureFfmpegLoaded() {
   if (!ffmpegInstance) {
@@ -103,37 +29,42 @@ async function ensureFfmpegLoaded() {
   return ffmpegInstance;
 }
 
+function buildClipFilter(index: number, isStaticClip: boolean) {
+  const source = isStaticClip
+    ? `[${index}:v]`
+    : `[${index}:v]`;
+
+  return `${source}fps=30,scale=${CONTENT_WIDTH}:${CONTENT_HEIGHT}:force_original_aspect_ratio=increase,crop=${CONTENT_WIDTH}:${CONTENT_HEIGHT},trim=duration=${CLIP_DURATION_SECONDS},setpts=PTS-STARTPTS[v${index}]`;
+}
+
+function buildConcatFilter(totalClips: number) {
+  const labels = Array.from({ length: totalClips }, (_, index) => `[v${index}]`).join("");
+  return `${labels}concat=n=${totalClips}:v=1:a=0[content]`;
+}
+
 export async function renderVideoPreview(input: {
   assets: ProjectAsset[];
-  settings: {
-    transitionKey: TransitionKey;
-    themeKey: ThemeKey;
-    frameStyleKey: FrameStyleKey;
-  };
+  backgroundVideoPath: string;
   musicFilePath?: string | null;
 }) {
   const ffmpeg = await ensureFfmpegLoaded();
-  const presetAssets = input.assets.map((asset) => ({
-    ...asset,
-    transitionKey: input.settings.transitionKey,
-    themeKey: input.settings.themeKey,
-    frameStyleKey: input.settings.frameStyleKey,
-  }));
-
   const args: string[] = ["-y"];
+  const playableAssets = input.assets.filter((asset) => asset.generationStatus === "completed");
 
-  for (let index = 0; index < presetAssets.length; index += 1) {
-    const asset = presetAssets[index];
+  if (playableAssets.length === 0) {
+    throw new Error("沒有可輸出的影片片段。");
+  }
+
+  for (let index = 0; index < playableAssets.length; index += 1) {
+    const asset = playableAssets[index];
 
     if (asset.isStaticClip) {
       await ffmpeg.writeFile(`clip-${index}.jpg`, await fetchFile(asset.originalUrl));
       args.push(
         "-loop",
         "1",
-        "-framerate",
-        "30",
         "-t",
-        String(asset.durationSeconds),
+        String(CLIP_DURATION_SECONDS),
         "-i",
         `clip-${index}.jpg`,
       );
@@ -145,10 +76,15 @@ export async function renderVideoPreview(input: {
     }
 
     await ffmpeg.writeFile(`clip-${index}.mp4`, await fetchFile(asset.generatedUrl));
-    args.push("-i", `clip-${index}.mp4`);
+    args.push("-stream_loop", "-1", "-i", `clip-${index}.mp4`);
   }
 
+  await ffmpeg.writeFile("background.mp4", await fetchFile(input.backgroundVideoPath));
+  args.push("-stream_loop", "-1", "-i", "background.mp4");
+  const backgroundInputIndex = playableAssets.length;
+
   let hasAudioTrack = false;
+  let audioInputIndex = -1;
 
   if (input.musicFilePath) {
     try {
@@ -158,19 +94,29 @@ export async function renderVideoPreview(input: {
         await ffmpeg.writeFile("music.mp3", musicBytes);
         args.push("-stream_loop", "-1", "-i", "music.mp3");
         hasAudioTrack = true;
+        audioInputIndex = playableAssets.length + 1;
       }
     } catch {
       hasAudioTrack = false;
     }
   }
 
-  const filterGraph = buildFilterGraph(presetAssets);
+  const totalDuration = playableAssets.length * CLIP_DURATION_SECONDS;
+  const fadeOutStart = Math.max(totalDuration - FADE_SECONDS, 0);
+  const clipFilters = playableAssets.map((asset, index) =>
+    buildClipFilter(index, asset.isStaticClip),
+  );
+  const concatFilter = buildConcatFilter(playableAssets.length);
+  const backgroundFilter = `[${backgroundInputIndex}:v]fps=30,scale=${BACKGROUND_WIDTH}:${BACKGROUND_HEIGHT}:force_original_aspect_ratio=increase,crop=${BACKGROUND_WIDTH}:${BACKGROUND_HEIGHT},trim=duration=${totalDuration},setpts=PTS-STARTPTS[bg]`;
+  const composeFilter = `[bg][content]overlay=(W-w)/2:(H-h)/2:shortest=1,fade=t=in:st=0:d=${FADE_SECONDS},fade=t=out:st=${fadeOutStart}:d=${FADE_SECONDS}[finalv]`;
+  const filterComplex = [...clipFilters, concatFilter, backgroundFilter, composeFilter].join(";");
+
   const outputArgs = [
     ...args,
     "-filter_complex",
-    filterGraph.filter,
+    filterComplex,
     "-map",
-    `[${filterGraph.outputLabel}]`,
+    "[finalv]",
     "-c:v",
     "libx264",
     "-pix_fmt",
@@ -179,8 +125,16 @@ export async function renderVideoPreview(input: {
     "+faststart",
   ];
 
-  if (hasAudioTrack) {
-    outputArgs.push("-map", `${presetAssets.length}:a`, "-c:a", "aac", "-shortest");
+  if (hasAudioTrack && audioInputIndex >= 0) {
+    outputArgs.push(
+      "-map",
+      `${audioInputIndex}:a`,
+      "-c:a",
+      "aac",
+      "-b:a",
+      "192k",
+      "-shortest",
+    );
   } else {
     outputArgs.push("-an");
   }

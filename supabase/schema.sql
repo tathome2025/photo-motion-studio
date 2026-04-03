@@ -57,7 +57,7 @@ create table if not exists public.project_canva_exports (
 create table if not exists public.project_template_configs (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null unique references public.projects(id) on delete cascade,
-  template_key text not null check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic')),
+  template_key text not null check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic', 'ocean-drift', 'night-pulse')),
   template_name text not null,
   music_key text not null check (music_key in ('track-01', 'track-02', 'track-03', 'track-04', 'track-05', 'track-06', 'track-07', 'track-08', 'track-09', 'track-10')),
   default_transition_key text not null check (default_transition_key in ('cut', 'fade', 'wipeleft', 'slideup')),
@@ -68,9 +68,10 @@ create table if not exists public.project_template_configs (
 );
 
 create table if not exists public.template_presets (
-  template_key text primary key check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic')),
+  template_key text primary key check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic', 'ocean-drift', 'night-pulse')),
   label text not null,
   description text not null,
+  background_video_path text not null,
   transition_key text not null check (transition_key in ('cut', 'fade', 'wipeleft', 'slideup')),
   theme_key text not null check (theme_key in ('editorial', 'mono', 'warm', 'blueprint')),
   frame_style_key text not null check (frame_style_key in ('none', 'single', 'double', 'offset')),
@@ -104,7 +105,7 @@ alter table public.project_template_configs
 
 alter table public.project_template_configs
   add constraint project_template_configs_template_key_check
-  check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic'));
+  check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic', 'ocean-drift', 'night-pulse'));
 
 alter table public.project_template_configs
   drop constraint if exists project_template_configs_music_key_check;
@@ -116,6 +117,7 @@ alter table public.project_template_configs
 alter table public.template_presets
   add column if not exists label text not null default 'Clean Cut',
   add column if not exists description text not null default 'Minimal line styling for direct storytelling.',
+  add column if not exists background_video_path text not null default '/background-themes/theme-01.mp4',
   add column if not exists transition_key text not null default 'cut',
   add column if not exists theme_key text not null default 'editorial',
   add column if not exists frame_style_key text not null default 'none',
@@ -126,7 +128,7 @@ alter table public.template_presets
 
 alter table public.template_presets
   add constraint template_presets_template_key_check
-  check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic'));
+  check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic', 'ocean-drift', 'night-pulse'));
 
 alter table public.template_presets
   drop constraint if exists template_presets_transition_key_check;
@@ -237,14 +239,17 @@ insert into public.template_presets (
   template_key,
   label,
   description,
+  background_video_path,
   transition_key,
   theme_key,
   frame_style_key,
   sort_order
 )
 values
-  ('clean-cut', 'Clean Cut', 'Minimal line styling for direct storytelling.', 'cut', 'editorial', 'none', 1),
-  ('magazine', 'Magazine Grid', 'Editorial look with gentle fades and slim frames.', 'fade', 'mono', 'single', 2),
-  ('spotlight', 'Spotlight', 'Warmer framing with stronger motion transitions.', 'wipeleft', 'warm', 'double', 3),
-  ('cinematic', 'Cinematic Motion', 'Blueprint tones with dramatic slide transitions.', 'slideup', 'blueprint', 'offset', 4)
+  ('clean-cut', 'Aurora Flow', 'Soft aurora background with clean centered storytelling.', '/background-themes/theme-01.mp4', 'cut', 'editorial', 'none', 1),
+  ('magazine', 'Studio Light', 'Bright studio light texture for modern portrait edits.', '/background-themes/theme-02.mp4', 'fade', 'mono', 'single', 2),
+  ('spotlight', 'Warm Grain', 'Warm film-grain style for emotional memory edits.', '/background-themes/theme-03.mp4', 'wipeleft', 'warm', 'double', 3),
+  ('cinematic', 'Neo Grid', 'Structured geometric motion background for dynamic cuts.', '/background-themes/theme-04.mp4', 'slideup', 'blueprint', 'offset', 4),
+  ('ocean-drift', 'Ocean Drift', 'Cool ocean flow background for calm pacing.', '/background-themes/theme-05.mp4', 'cut', 'editorial', 'none', 5),
+  ('night-pulse', 'Night Pulse', 'Dark ambient pulse background for stronger contrast.', '/background-themes/theme-06.mp4', 'fade', 'mono', 'single', 6)
 on conflict (template_key) do nothing;

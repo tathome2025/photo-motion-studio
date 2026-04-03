@@ -105,31 +105,45 @@ export function getStudioTemplateOptions(locale: Locale) {
     { label: Record<Locale, string>; description: Record<Locale, string> }
   > = {
     "clean-cut": {
-      label: { zh: "清晰直剪", en: "Clean Cut" },
+      label: { zh: "極光流動", en: "Aurora Flow" },
       description: {
-        zh: "最簡約的線條風格，直接切換畫面。",
-        en: "Minimal line styling with direct cuts.",
+        zh: "柔和極光背景，突出主體影片內容。",
+        en: "Soft aurora background with centered storytelling.",
       },
     },
     magazine: {
-      label: { zh: "雜誌版面", en: "Magazine Grid" },
+      label: { zh: "攝影棚光影", en: "Studio Light" },
       description: {
-        zh: "編輯感版面，使用淡入淡出與單層邊框。",
-        en: "Editorial layout with fades and single frames.",
+        zh: "明亮光影紋理，風格專業乾淨。",
+        en: "Bright studio light texture for modern edits.",
       },
     },
     spotlight: {
-      label: { zh: "焦點舞台", en: "Spotlight" },
+      label: { zh: "暖色顆粒", en: "Warm Grain" },
       description: {
-        zh: "暖色重點風格，轉場節奏更明顯。",
-        en: "Warm spotlight style with stronger transitions.",
+        zh: "暖色膠片顆粒感，偏情感回憶風格。",
+        en: "Warm film-grain style for emotional edits.",
       },
     },
     cinematic: {
-      label: { zh: "電影感動態", en: "Cinematic Motion" },
+      label: { zh: "幾何動感", en: "Neo Grid" },
       description: {
-        zh: "藍圖色調配上更有戲劇感的滑入轉場。",
-        en: "Blueprint tone with dramatic slide transitions.",
+        zh: "幾何線條動態背景，節奏更鮮明。",
+        en: "Structured geometric motion background.",
+      },
+    },
+    "ocean-drift": {
+      label: { zh: "海洋漂流", en: "Ocean Drift" },
+      description: {
+        zh: "清爽冷色流動背景，節奏平穩。",
+        en: "Cool ocean flow background for calm pacing.",
+      },
+    },
+    "night-pulse": {
+      label: { zh: "夜幕脈衝", en: "Night Pulse" },
+      description: {
+        zh: "夜景脈衝背景，對比感更強。",
+        en: "Dark ambient pulse background with strong contrast.",
       },
     },
   };

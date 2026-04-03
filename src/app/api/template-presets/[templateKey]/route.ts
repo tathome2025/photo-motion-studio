@@ -5,12 +5,20 @@ import { z } from "zod";
 import { updateStudioTemplatePreset } from "@/lib/data";
 
 const paramsSchema = z.object({
-  templateKey: z.enum(["clean-cut", "magazine", "spotlight", "cinematic"]),
+  templateKey: z.enum([
+    "clean-cut",
+    "magazine",
+    "spotlight",
+    "cinematic",
+    "ocean-drift",
+    "night-pulse",
+  ]),
 });
 
 const payloadSchema = z.object({
   label: z.string().min(1).max(80),
   description: z.string().min(1).max(240),
+  backgroundVideoPath: z.string().min(1).max(240),
   transitionKey: z.enum(["cut", "fade", "wipeleft", "slideup"]),
   themeKey: z.enum(["editorial", "mono", "warm", "blueprint"]),
   frameStyleKey: z.enum(["none", "single", "double", "offset"]),
@@ -27,6 +35,7 @@ export async function PATCH(
       templateKey: params.templateKey,
       label: payload.label,
       description: payload.description,
+      backgroundVideoPath: payload.backgroundVideoPath,
       transitionKey: payload.transitionKey,
       themeKey: payload.themeKey,
       frameStyleKey: payload.frameStyleKey,

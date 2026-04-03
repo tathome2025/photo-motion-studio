@@ -34,7 +34,13 @@ export type ThemeKey = "editorial" | "mono" | "warm" | "blueprint";
 
 export type FrameStyleKey = "none" | "single" | "double" | "offset";
 
-export type StudioTemplateKey = "clean-cut" | "magazine" | "spotlight" | "cinematic";
+export type StudioTemplateKey =
+  | "clean-cut"
+  | "magazine"
+  | "spotlight"
+  | "cinematic"
+  | "ocean-drift"
+  | "night-pulse";
 export type MusicTrackKey =
   | "track-01"
   | "track-02"
@@ -75,6 +81,7 @@ export interface StudioTemplatePreset {
   key: StudioTemplateKey;
   label: string;
   description: string;
+  backgroundVideoPath: string;
   transitionKey: TransitionKey;
   themeKey: ThemeKey;
   frameStyleKey: FrameStyleKey;

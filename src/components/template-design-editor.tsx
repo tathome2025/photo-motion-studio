@@ -151,6 +151,15 @@ function TransitionStagePreview({
 
   return (
     <div className="relative h-full w-full overflow-hidden border" style={{ borderColor: theme.border }}>
+      <video
+        src={template.backgroundVideoPath}
+        className="absolute inset-0 h-full w-full object-cover"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+      <div className="absolute inset-0" style={{ backgroundColor: `${theme.background}80` }} />
       <div className="absolute inset-0 p-5" style={firstStyle}>
         <div
           className="grid h-full grid-rows-[1fr_auto] gap-3 border p-3"
@@ -266,6 +275,7 @@ export function TemplateDesignEditor({ initialTemplates }: TemplateDesignEditorP
         body: JSON.stringify({
           label: template.label,
           description: template.description,
+          backgroundVideoPath: template.backgroundVideoPath,
           transitionKey: template.transitionKey,
           themeKey: template.themeKey,
           frameStyleKey: template.frameStyleKey,
@@ -389,6 +399,15 @@ export function TemplateDesignEditor({ initialTemplates }: TemplateDesignEditorP
               className="min-h-24 border border-[var(--line)] bg-transparent px-3 py-2 text-sm text-[var(--text)] outline-none"
               value={activeTemplate.description}
               onChange={(event) => updateActiveTemplate("description", event.target.value)}
+            />
+          </label>
+
+          <label className="grid gap-1 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+            Background video
+            <input
+              className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
+              value={activeTemplate.backgroundVideoPath}
+              readOnly
             />
           </label>
 

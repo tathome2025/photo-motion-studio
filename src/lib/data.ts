@@ -88,6 +88,7 @@ type TemplatePresetRow = {
   template_key: StudioTemplateKey;
   label: string;
   description: string;
+  background_video_path: string | null;
   transition_key: ProjectAsset["transitionKey"];
   theme_key: ProjectAsset["themeKey"];
   frame_style_key: ProjectAsset["frameStyleKey"];
@@ -153,10 +154,18 @@ function mapTemplateConfig(row: ProjectTemplateConfigRow): ProjectTemplateConfig
 }
 
 function mapTemplatePreset(row: TemplatePresetRow): StudioTemplatePreset {
+  const defaultPreset = STUDIO_TEMPLATE_PRESETS.find(
+    (item) => item.key === row.template_key,
+  );
+
   return {
     key: row.template_key,
-    label: row.label,
-    description: row.description,
+    label: row.label || defaultPreset?.label || row.template_key,
+    description: row.description || defaultPreset?.description || "",
+    backgroundVideoPath:
+      row.background_video_path ||
+      defaultPreset?.backgroundVideoPath ||
+      "/background-themes/theme-01.mp4",
     transitionKey: row.transition_key,
     themeKey: row.theme_key,
     frameStyleKey: row.frame_style_key,
@@ -856,30 +865,55 @@ export async function listStudioTemplatePresets() {
   }
 
   const presets = ((data ?? []) as TemplatePresetRow[]).map(mapTemplatePreset);
-  return presets.length > 0 ? presets : STUDIO_TEMPLATE_PRESETS;
+
+  if (presets.length === 0) {
+    return STUDIO_TEMPLATE_PRESETS;
+  }
+
+  const presetMap = new Map<StudioTemplateKey, StudioTemplatePreset>();
+
+  for (const preset of STUDIO_TEMPLATE_PRESETS) {
+    presetMap.set(preset.key, preset);
+  }
+
+  for (const preset of presets) {
+    presetMap.set(preset.key, preset);
+  }
+
+  return STUDIO_TEMPLATE_PRESETS.map((preset) => presetMap.get(preset.key) ?? preset);
 }
 
 export async function updateStudioTemplatePreset(input: {
   templateKey: StudioTemplateKey;
   label: string;
   description: string;
+  backgroundVideoPath: string;
   transitionKey: ProjectAsset["transitionKey"];
   themeKey: ProjectAsset["themeKey"];
   frameStyleKey: ProjectAsset["frameStyleKey"];
 }) {
   const client = assertSupabaseAdmin();
+  const sortOrder = Math.max(
+    1,
+    STUDIO_TEMPLATE_PRESETS.findIndex((item) => item.key === input.templateKey) + 1,
+  );
   const { data, error } = await client
     .from("template_presets")
-    .update({
-      label: input.label.trim(),
-      description: input.description.trim(),
-      transition_key: input.transitionKey,
-      theme_key: input.themeKey,
-      frame_style_key: input.frameStyleKey,
-    })
-    .eq("template_key", input.templateKey)
+    .upsert(
+      {
+        template_key: input.templateKey,
+        label: input.label.trim(),
+        description: input.description.trim(),
+        background_video_path: input.backgroundVideoPath.trim(),
+        transition_key: input.transitionKey,
+        theme_key: input.themeKey,
+        frame_style_key: input.frameStyleKey,
+        sort_order: sortOrder,
+      },
+      { onConflict: "template_key" },
+    )
     .select("*")
-    .maybeSingle();
+    .single();
 
   if (error) {
     if (error.message.includes("template_presets")) {
@@ -887,10 +921,6 @@ export async function updateStudioTemplatePreset(input: {
     }
 
     throw new Error(error.message);
-  }
-
-  if (!data) {
-    throw new Error("找不到要更新的模板。");
   }
 
   return mapTemplatePreset(data as TemplatePresetRow);

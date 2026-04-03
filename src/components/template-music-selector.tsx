@@ -55,7 +55,7 @@ export function TemplateMusicSelector({
       ? {
           title: "Choose template and music",
           description:
-            "After ordering clips, select one of the 4 preset templates and one background track. The next step will render a full preview video.",
+            "After ordering clips, choose one of the 6 background themes and one music track. Output will place your 1344x756 content video centered on a 1920x1080 theme background.",
           backToEdit: "Back to timeline",
           applyAndContinue: "Render preview",
           applying: "Preparing...",
@@ -67,7 +67,7 @@ export function TemplateMusicSelector({
       : {
           title: "選擇模板與音樂",
           description:
-            "完成排位後，請在 4 個預設模板中選 1 個，再選 1 首背景音樂。下一步會渲染完整預覽影片。",
+            "完成排位後，請在 6 款背景主題中選 1 款，再選 1 首背景音樂。輸出時會把 1344x756 內容影片置中疊在 1920x1080 背景影片。",
           backToEdit: "返回時間線",
           applyAndContinue: "前往渲染預覽",
           applying: "準備中...",
@@ -90,7 +90,7 @@ export function TemplateMusicSelector({
         body: JSON.stringify({
           templateKey: selectedTemplate,
           musicKey: selectedMusic,
-          applyToAllAssets: true,
+          applyToAllAssets: false,
         }),
       });
       const data = await parseApiResponse(response);
@@ -139,6 +139,14 @@ export function TemplateMusicSelector({
               >
                 <span className="text-sm uppercase tracking-[0.18em]">{template.label}</span>
                 <span className="text-sm text-[var(--muted)]">{template.description}</span>
+                <video
+                  src={template.backgroundVideoPath}
+                  className="mt-1 aspect-video w-full border border-[var(--line)] object-cover"
+                  muted
+                  autoPlay
+                  loop
+                  playsInline
+                />
               </button>
             ))}
           </div>
