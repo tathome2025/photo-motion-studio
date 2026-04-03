@@ -43,8 +43,9 @@ create table if not exists public.render_jobs (
 create table if not exists public.project_canva_exports (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null unique references public.projects(id) on delete cascade,
-  template_key text not null check (template_key in ('canva-clean', 'canva-editorial', 'canva-vibrant')),
+  template_key text not null,
   template_name text not null,
+  template_url text not null,
   status text not null default 'completed' check (status in ('idle', 'processing', 'completed', 'failed')),
   slide_count integer not null default 0,
   clip_urls jsonb not null default '[]'::jsonb,
@@ -60,6 +61,11 @@ alter table public.project_assets
   add column if not exists custom_prompt text,
   add column if not exists regeneration_count integer not null default 0,
   add column if not exists is_static_clip boolean not null default false;
+
+alter table public.project_canva_exports
+  add column if not exists template_url text not null default '';
+
+alter table public.project_canva_exports drop constraint if exists project_canva_exports_template_key_check;
 
 alter table public.project_assets drop constraint if exists project_assets_prompt_key_check;
 

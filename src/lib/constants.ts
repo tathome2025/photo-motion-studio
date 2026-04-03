@@ -1,5 +1,4 @@
 import type {
-  CanvaSlideshowTemplate,
   FrameStyleOption,
   PromptOption,
   ThemeOption,
@@ -42,33 +41,6 @@ export const FRAME_STYLE_OPTIONS: FrameStyleOption[] = [
   { key: "single", label: "Single" },
   { key: "double", label: "Double" },
   { key: "offset", label: "Offset" },
-];
-
-export const CANVA_SLIDESHOW_TEMPLATES: CanvaSlideshowTemplate[] = [
-  {
-    key: "canva-clean",
-    name: "Canva Free · Clean Frames",
-    description: "Simple slide rhythm with soft spacing and neutral stroke.",
-    accent: "#161616",
-    surface: "#f7f4ee",
-    createUrl: "https://www.canva.com/templates/search/slideshow/?pricing=FREE",
-  },
-  {
-    key: "canva-editorial",
-    name: "Canva Free · Editorial Story",
-    description: "Magazine-like pacing with generous whitespace.",
-    accent: "#2f3d4a",
-    surface: "#e9edf2",
-    createUrl: "https://www.canva.com/templates/search/slideshow/?pricing=FREE",
-  },
-  {
-    key: "canva-vibrant",
-    name: "Canva Free · Vibrant Motion",
-    description: "High-contrast cover and stronger visual cadence.",
-    accent: "#4a2718",
-    surface: "#f2e4db",
-    createUrl: "https://www.canva.com/templates/search/slideshow/?pricing=FREE",
-  },
 ];
 
 export const DEFAULT_THEME_KEY = "editorial";

@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 
 import {
-  CANVA_SLIDESHOW_TEMPLATES,
   DEFAULT_CLIP_DURATION,
   GENERATED_BUCKET,
   MAX_REGENERATION_COUNT,
@@ -17,7 +16,6 @@ import type {
   ProjectSummary,
   PromptKey,
   TimelineUpdateItem,
-  CanvaSlideshowTemplateKey,
   CanvaExportStatus,
 } from "@/lib/types";
 
@@ -55,8 +53,9 @@ type AssetRow = {
 type ProjectCanvaExportRow = {
   id: string;
   project_id: string;
-  template_key: CanvaSlideshowTemplateKey;
+  template_key: string;
   template_name: string;
+  template_url: string;
   status: CanvaExportStatus;
   slide_count: number;
   clip_urls: unknown;
@@ -96,6 +95,7 @@ function mapCanvaExport(row: ProjectCanvaExportRow): ProjectCanvaExport {
     projectId: row.project_id,
     templateKey: row.template_key,
     templateName: row.template_name,
+    templateUrl: row.template_url ?? "",
     status: row.status,
     slideCount: row.slide_count,
     clipUrls: Array.isArray(row.clip_urls)
@@ -104,6 +104,56 @@ function mapCanvaExport(row: ProjectCanvaExportRow): ProjectCanvaExport {
     errorMessage: row.error_message,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function parseCanvaTemplateUrl(input: string) {
+  let parsed: URL;
+
+  try {
+    parsed = new URL(input);
+  } catch {
+    throw new Error("Canva template URL 格式不正確。");
+  }
+
+  if (!["https:", "http:"].includes(parsed.protocol)) {
+    throw new Error("Canva template URL 必須是 http 或 https。");
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  const isCanvaHost =
+    host === "canva.com" ||
+    host.endsWith(".canva.com") ||
+    host === "canva.cn" ||
+    host.endsWith(".canva.cn") ||
+    host === "canva.link" ||
+    host.endsWith(".canva.link");
+
+  if (!isCanvaHost) {
+    throw new Error("請貼上 Canva 的 template 連結。");
+  }
+
+  const designMatch = parsed.pathname.match(/\/design\/([A-Za-z0-9_-]+)/);
+
+  if (designMatch) {
+    return {
+      templateKey: designMatch[1],
+      templateUrl: parsed.toString(),
+    };
+  }
+
+  const templateSlugMatch = parsed.pathname.match(/\/templates\/([^/?#]+)/);
+
+  if (templateSlugMatch) {
+    return {
+      templateKey: templateSlugMatch[1],
+      templateUrl: parsed.toString(),
+    };
+  }
+
+  return {
+    templateKey: `external-${crypto.randomUUID()}`,
+    templateUrl: parsed.toString(),
   };
 }
 
@@ -737,16 +787,11 @@ export async function getProjectCanvaExport(projectId: string) {
 
 export async function composeProjectCanvaSlideshow(input: {
   projectId: string;
-  templateKey: CanvaSlideshowTemplateKey;
+  templateUrl: string;
+  templateName?: string | null;
   orderedAssetIds?: string[];
 }) {
-  const template = CANVA_SLIDESHOW_TEMPLATES.find(
-    (item) => item.key === input.templateKey,
-  );
-
-  if (!template) {
-    throw new Error("找不到 Canva slideshow 範本。");
-  }
+  const parsedTemplate = parseCanvaTemplateUrl(input.templateUrl);
 
   const project = await getProjectDetails(input.projectId);
 
@@ -782,13 +827,15 @@ export async function composeProjectCanvaSlideshow(input: {
   }
 
   const client = assertSupabaseAdmin();
+  const templateName = input.templateName?.trim() || "Canva Slideshow Template";
   const { data, error } = await client
     .from("project_canva_exports")
     .upsert(
       {
         project_id: input.projectId,
-        template_key: template.key,
-        template_name: template.name,
+        template_key: parsedTemplate.templateKey,
+        template_name: templateName,
+        template_url: parsedTemplate.templateUrl,
         status: "completed",
         slide_count: clipUrls.length,
         clip_urls: clipUrls,
@@ -800,7 +847,10 @@ export async function composeProjectCanvaSlideshow(input: {
     .single();
 
   if (error) {
-    if (error.message.includes("project_canva_exports")) {
+    if (
+      error.message.includes("project_canva_exports") ||
+      error.message.includes("template_url")
+    ) {
       throw new Error("尚未建立 Canva 匯出資料表。請先執行最新 supabase/schema.sql。");
     }
 

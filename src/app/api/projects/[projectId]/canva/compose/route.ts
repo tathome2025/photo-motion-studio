@@ -5,7 +5,8 @@ import { z } from "zod";
 import { composeProjectCanvaSlideshow } from "@/lib/data";
 
 const payloadSchema = z.object({
-  templateKey: z.enum(["canva-clean", "canva-editorial", "canva-vibrant"]),
+  templateUrl: z.string().min(1),
+  templateName: z.string().max(120).optional(),
   orderedAssetIds: z.array(z.string().uuid()).optional(),
 });
 
@@ -18,7 +19,8 @@ export async function POST(
     const payload = payloadSchema.parse(await request.json());
     const canvaExport = await composeProjectCanvaSlideshow({
       projectId,
-      templateKey: payload.templateKey,
+      templateUrl: payload.templateUrl,
+      templateName: payload.templateName,
       orderedAssetIds: payload.orderedAssetIds,
     });
 

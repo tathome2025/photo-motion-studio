@@ -34,11 +34,6 @@ export type ThemeKey = "editorial" | "mono" | "warm" | "blueprint";
 
 export type FrameStyleKey = "none" | "single" | "double" | "offset";
 
-export type CanvaSlideshowTemplateKey =
-  | "canva-clean"
-  | "canva-editorial"
-  | "canva-vibrant";
-
 export interface PromptOption {
   key: PromptKey;
   label: string;
@@ -61,15 +56,6 @@ export interface ThemeOption {
 export interface FrameStyleOption {
   key: FrameStyleKey;
   label: string;
-}
-
-export interface CanvaSlideshowTemplate {
-  key: CanvaSlideshowTemplateKey;
-  name: string;
-  description: string;
-  accent: string;
-  surface: string;
-  createUrl: string;
 }
 
 export interface ProjectSummary {
@@ -113,8 +99,9 @@ export interface ProjectDetails extends ProjectSummary {
 export interface ProjectCanvaExport {
   id: string;
   projectId: string;
-  templateKey: CanvaSlideshowTemplateKey;
+  templateKey: string;
   templateName: string;
+  templateUrl: string;
   status: CanvaExportStatus;
   slideCount: number;
   clipUrls: string[];

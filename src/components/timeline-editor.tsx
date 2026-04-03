@@ -27,14 +27,12 @@ import {
   THEME_OPTIONS,
 } from "@/lib/constants";
 import {
-  getCanvaSlideshowTemplates,
   getFrameStyleOptions,
   getThemeOptions,
   getTransitionOptions,
   type Locale,
 } from "@/lib/i18n";
 import type {
-  CanvaSlideshowTemplateKey,
   ProjectAsset,
   ProjectCanvaExport,
   TimelineUpdateItem,
@@ -50,6 +48,23 @@ interface TimelineEditorProps {
 function isImageUrl(url: string) {
   const normalized = url.toLowerCase();
   return normalized.includes(".jpg") || normalized.includes(".jpeg") || normalized.includes(".png");
+}
+
+function isCanvaTemplateUrl(value: string) {
+  try {
+    const parsed = new URL(value.trim());
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host === "canva.com" ||
+      host.endsWith(".canva.com") ||
+      host === "canva.cn" ||
+      host.endsWith(".canva.cn") ||
+      host === "canva.link" ||
+      host.endsWith(".canva.link")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function toFfmpegColor(color: string) {
@@ -223,15 +238,13 @@ export function TimelineEditor({
   locale,
 }: TimelineEditorProps) {
   const sensors = useSensors(useSensor(PointerSensor));
-  const canvaTemplates = getCanvaSlideshowTemplates(locale);
   const transitionOptions = getTransitionOptions(locale);
   const themeOptions = getThemeOptions(locale);
   const frameStyleOptions = getFrameStyleOptions(locale);
   const [assets, setAssets] = useState(initialAssets);
   const [canvaExport, setCanvaExport] = useState<ProjectCanvaExport | null>(initialCanvaExport);
-  const [selectedTemplateKey, setSelectedTemplateKey] = useState<CanvaSlideshowTemplateKey>(
-    initialCanvaExport?.templateKey ?? canvaTemplates[0]?.key ?? "canva-clean",
-  );
+  const [templateUrlInput, setTemplateUrlInput] = useState(initialCanvaExport?.templateUrl ?? "");
+  const [templateNameInput, setTemplateNameInput] = useState(initialCanvaExport?.templateName ?? "");
   const [canvaPreviewIndex, setCanvaPreviewIndex] = useState(0);
   const [selectedAssetId, setSelectedAssetId] = useState(initialAssets[0]?.id ?? null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -274,22 +287,29 @@ export function TimelineEditor({
           openRegenerate: "Open regenerate page",
           deletePhoto: "Delete photo",
           canvaSection: "Canva slideshow",
-          canvaTitle: "Choose a free Canva slideshow template",
+          canvaTitle: "Choose a real Canva template",
           canvaDescription:
-            "After ordering your clips, apply one template. The app maps clips into the selected slideshow layout automatically and prepares an in-app preview.",
-          applyTemplate: "Apply template",
+            "Pick a template in Canva first, then paste the template URL here. The app will map your ordered clips into that selected template flow.",
+          applyTemplate: "Apply selected template",
           applyingTemplate: "Applying...",
           applyFailed: "Failed to apply Canva template.",
           previewReady: "Template applied. Preview is ready.",
           previewEmpty: "Apply a template first to preview.",
           previewTag: "Canva preview",
           mappedClips: (count: number) => `${count} clip(s) mapped`,
-          openCanvaTemplates: "Open Canva free templates",
+          openCanvaTemplates: "Open Canva templates",
           redoCanva: "Redo",
           redoingCanva: "Redoing...",
           redoFailed: "Failed to redo Canva slideshow.",
           downloadFromCanva: "Download slideshow",
-          selectTemplate: "Select template",
+          templateUrlLabel: "Canva template URL",
+          templateUrlPlaceholder: "https://www.canva.com/templates/...",
+          templateNameLabel: "Template name (optional)",
+          templateNamePlaceholder: "Example: Modern Travel Slideshow",
+          viewTemplate: "View selected template",
+          invalidTemplateUrl: "Please paste a valid Canva template URL.",
+          findTemplateHint:
+            "Open Canva template gallery, choose one template, copy the template link, then paste it here.",
           horizontalTimeline: "Horizontal timeline",
           reorder: "Drag thumbnails to reorder",
           clips: (count: number) => `${count} clips`,
@@ -326,22 +346,29 @@ export function TimelineEditor({
           openRegenerate: "打開重新生成頁面",
           deletePhoto: "刪除相片",
           canvaSection: "Canva slideshow",
-          canvaTitle: "選擇 Canva 免費 Slideshow 範本",
+          canvaTitle: "選擇 Canva 真實範本",
           canvaDescription:
-            "完成排位後可套用一個範本，系統會按你的時間線順序把動態影像自動放入 slideshow，並建立 app 內 preview。",
-          applyTemplate: "套用範本",
+            "請先到 Canva 真正選好範本，再把範本連結貼回這裡。系統會按你的排位順序自動映射片段。",
+          applyTemplate: "套用已選範本",
           applyingTemplate: "套用中...",
           applyFailed: "套用 Canva 範本失敗。",
           previewReady: "範本已套用，可即時 preview。",
           previewEmpty: "先套用範本，之後會在此顯示 preview。",
           previewTag: "Canva preview",
           mappedClips: (count: number) => `已映射 ${count} 段片段`,
-          openCanvaTemplates: "開啟 Canva 免費範本頁",
+          openCanvaTemplates: "開啟 Canva 範本頁",
           redoCanva: "重做",
           redoingCanva: "重做中...",
           redoFailed: "重做 Canva slideshow 失敗。",
           downloadFromCanva: "下載 slideshow",
-          selectTemplate: "選擇範本",
+          templateUrlLabel: "Canva 範本連結",
+          templateUrlPlaceholder: "https://www.canva.com/templates/...",
+          templateNameLabel: "範本名稱（可選）",
+          templateNamePlaceholder: "例如：Travel Slideshow",
+          viewTemplate: "查看已選範本",
+          invalidTemplateUrl: "請貼上有效的 Canva 範本連結。",
+          findTemplateHint:
+            "先打開 Canva 範本庫，挑好範本後複製連結，再貼回這裡。",
           horizontalTimeline: "Horizontal timeline",
           reorder: "拖動縮圖重新排序",
           clips: (count: number) => `${count} clips`,
@@ -451,13 +478,21 @@ export function TimelineEditor({
     setCanvaWorking(true);
 
     try {
+      const trimmedTemplateUrl = templateUrlInput.trim();
+
+      if (!isCanvaTemplateUrl(trimmedTemplateUrl)) {
+        setError(copy.invalidTemplateUrl);
+        return;
+      }
+
       const response = await fetch(`/api/projects/${projectId}/canva/compose`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          templateKey: selectedTemplateKey,
+          templateUrl: trimmedTemplateUrl,
+          templateName: templateNameInput.trim() || undefined,
           orderedAssetIds: assets.map((asset) => asset.id),
         }),
       });
@@ -468,7 +503,12 @@ export function TimelineEditor({
         return;
       }
 
-      setCanvaExport((data as { canvaExport?: ProjectCanvaExport }).canvaExport ?? null);
+      const nextCanvaExport = (data as { canvaExport?: ProjectCanvaExport }).canvaExport ?? null;
+      setCanvaExport(nextCanvaExport);
+      if (nextCanvaExport) {
+        setTemplateUrlInput(nextCanvaExport.templateUrl);
+        setTemplateNameInput(nextCanvaExport.templateName);
+      }
       setCanvaPreviewIndex(0);
       setStatusMessage(copy.previewReady);
     } finally {
@@ -629,8 +669,6 @@ export function TimelineEditor({
 
   const selectedTheme =
     THEME_OPTIONS.find((item) => item.key === selectedAsset.themeKey) ?? THEME_OPTIONS[0];
-  const selectedCanvaTemplate =
-    canvaTemplates.find((item) => item.key === selectedTemplateKey) ?? canvaTemplates[0];
   const canvaPreviewUrl =
     canvaExport?.clipUrls[canvaPreviewIndex] ??
     canvaExport?.clipUrls[0] ??
@@ -851,53 +889,54 @@ export function TimelineEditor({
 
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="grid gap-4">
-            <div className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-              <span>{copy.selectTemplate}</span>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href="https://www.canva.com/templates/?query=slideshow"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-11 items-center justify-center border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
+              >
+                {copy.openCanvaTemplates}
+              </a>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {canvaTemplates.map((template) => {
-                const active = template.key === selectedTemplateKey;
-                return (
-                  <button
-                    key={template.key}
-                    type="button"
-                    className={`grid gap-3 border p-4 text-left transition ${
-                      active ? "border-[var(--text)] bg-[var(--surface-soft)]" : "border-[var(--line)]"
-                    }`}
-                    onClick={() => setSelectedTemplateKey(template.key)}
-                  >
-                    <div
-                      className="h-24 border"
-                      style={{
-                        borderColor: template.accent,
-                        backgroundColor: template.surface,
-                      }}
-                    />
-                    <div className="grid gap-1">
-                      <div className="text-sm tracking-tight">{template.name}</div>
-                      <div className="text-xs leading-6 text-[var(--muted)]">{template.description}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            <p className="text-sm leading-7 text-[var(--muted)]">
+              {copy.findTemplateHint}
+            </p>
+            <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+              {copy.templateUrlLabel}
+              <input
+                className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none focus:border-[var(--text)]"
+                placeholder={copy.templateUrlPlaceholder}
+                value={templateUrlInput}
+                onChange={(event) => setTemplateUrlInput(event.target.value)}
+              />
+            </label>
+            <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+              {copy.templateNameLabel}
+              <input
+                className="h-11 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none focus:border-[var(--text)]"
+                placeholder={copy.templateNamePlaceholder}
+                value={templateNameInput}
+                onChange={(event) => setTemplateNameInput(event.target.value)}
+              />
+            </label>
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
                 className="h-11 border border-[var(--text)] px-4 text-xs uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)] disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:text-[var(--muted)]"
                 onClick={applyCanvaTemplate}
-                disabled={canvaWorking || assets.length === 0}
+                disabled={canvaWorking || assets.length === 0 || !isCanvaTemplateUrl(templateUrlInput)}
               >
                 {canvaWorking ? copy.applyingTemplate : copy.applyTemplate}
               </button>
-              {selectedCanvaTemplate ? (
+              {canvaExport?.templateUrl ? (
                 <a
-                  href={selectedCanvaTemplate.createUrl}
+                  href={canvaExport.templateUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex h-11 items-center justify-center border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
                 >
-                  {copy.openCanvaTemplates}
+                  {copy.viewTemplate}
                 </a>
               ) : null}
             </div>
