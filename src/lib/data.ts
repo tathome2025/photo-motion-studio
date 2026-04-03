@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 import {
+  CANVA_SLIDESHOW_TEMPLATES,
   DEFAULT_CLIP_DURATION,
   GENERATED_BUCKET,
   MAX_REGENERATION_COUNT,
@@ -10,11 +11,14 @@ import { assertSupabaseAdmin, getSupabaseAdmin } from "@/lib/supabase";
 import type {
   AssetGenerationStatus,
   ProjectAsset,
+  ProjectCanvaExport,
   ProjectDetails,
   ProjectStatus,
   ProjectSummary,
   PromptKey,
   TimelineUpdateItem,
+  CanvaSlideshowTemplateKey,
+  CanvaExportStatus,
 } from "@/lib/types";
 
 type ProjectRow = {
@@ -48,6 +52,19 @@ type AssetRow = {
   updated_at: string;
 };
 
+type ProjectCanvaExportRow = {
+  id: string;
+  project_id: string;
+  template_key: CanvaSlideshowTemplateKey;
+  template_name: string;
+  status: CanvaExportStatus;
+  slide_count: number;
+  clip_urls: unknown;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 function mapAsset(row: AssetRow): ProjectAsset {
   return {
     id: row.id,
@@ -67,6 +84,23 @@ function mapAsset(row: AssetRow): ProjectAsset {
     themeKey: row.theme_key,
     frameStyleKey: row.frame_style_key,
     durationSeconds: row.duration_seconds ?? DEFAULT_CLIP_DURATION,
+    errorMessage: row.error_message,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapCanvaExport(row: ProjectCanvaExportRow): ProjectCanvaExport {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    templateKey: row.template_key,
+    templateName: row.template_name,
+    status: row.status,
+    slideCount: row.slide_count,
+    clipUrls: Array.isArray(row.clip_urls)
+      ? row.clip_urls.filter((item): item is string => typeof item === "string")
+      : [],
     errorMessage: row.error_message,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -220,10 +254,12 @@ export async function getProjectDetails(
   }
 
   const mappedAssets = await listAssetsForProject(projectId);
+  const canvaExport = await getProjectCanvaExport(projectId);
 
   return {
     ...buildSummary(project as ProjectRow, mappedAssets),
     assets: mappedAssets,
+    canvaExport,
   };
 }
 
@@ -678,6 +714,116 @@ export async function saveTimeline(
   }
 
   await touchProject(projectId, "ready");
+}
+
+export async function getProjectCanvaExport(projectId: string) {
+  const client = assertSupabaseAdmin();
+  const { data, error } = await client
+    .from("project_canva_exports")
+    .select("*")
+    .eq("project_id", projectId)
+    .maybeSingle();
+
+  if (error) {
+    if (error.message.includes("project_canva_exports")) {
+      return null;
+    }
+
+    throw new Error(error.message);
+  }
+
+  return data ? mapCanvaExport(data as ProjectCanvaExportRow) : null;
+}
+
+export async function composeProjectCanvaSlideshow(input: {
+  projectId: string;
+  templateKey: CanvaSlideshowTemplateKey;
+  orderedAssetIds?: string[];
+}) {
+  const template = CANVA_SLIDESHOW_TEMPLATES.find(
+    (item) => item.key === input.templateKey,
+  );
+
+  if (!template) {
+    throw new Error("找不到 Canva slideshow 範本。");
+  }
+
+  const project = await getProjectDetails(input.projectId);
+
+  if (!project) {
+    throw new Error("找不到專案。");
+  }
+
+  const completedAssets = project.assets.filter(
+    (asset) => asset.generationStatus === "completed",
+  );
+
+  if (completedAssets.length === 0) {
+    throw new Error("未有可套用範本的動態影像。");
+  }
+
+  let orderedAssets = completedAssets;
+
+  if (input.orderedAssetIds && input.orderedAssetIds.length > 0) {
+    const orderMap = new Map(input.orderedAssetIds.map((id, index) => [id, index]));
+    orderedAssets = [...completedAssets].sort((left, right) => {
+      const leftOrder = orderMap.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = orderMap.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+      return leftOrder - rightOrder;
+    });
+  }
+
+  const clipUrls = orderedAssets
+    .map((asset) => (asset.isStaticClip ? asset.originalUrl : asset.generatedUrl))
+    .filter((url): url is string => Boolean(url));
+
+  if (clipUrls.length === 0) {
+    throw new Error("已完成片段缺少可預覽網址，請重新同步後再試。");
+  }
+
+  const client = assertSupabaseAdmin();
+  const { data, error } = await client
+    .from("project_canva_exports")
+    .upsert(
+      {
+        project_id: input.projectId,
+        template_key: template.key,
+        template_name: template.name,
+        status: "completed",
+        slide_count: clipUrls.length,
+        clip_urls: clipUrls,
+        error_message: null,
+      },
+      { onConflict: "project_id" },
+    )
+    .select("*")
+    .single();
+
+  if (error) {
+    if (error.message.includes("project_canva_exports")) {
+      throw new Error("尚未建立 Canva 匯出資料表。請先執行最新 supabase/schema.sql。");
+    }
+
+    throw new Error(error.message);
+  }
+
+  return mapCanvaExport(data as ProjectCanvaExportRow);
+}
+
+export async function resetProjectCanvaSlideshow(projectId: string) {
+  const client = assertSupabaseAdmin();
+  const { error } = await client
+    .from("project_canva_exports")
+    .delete()
+    .eq("project_id", projectId);
+
+  if (error) {
+    if (error.message.includes("project_canva_exports")) {
+      throw new Error("尚未建立 Canva 匯出資料表。請先執行最新 supabase/schema.sql。");
+    }
+
+    throw new Error(error.message);
+  }
 }
 
 export function buildOriginalStoragePath(projectId: string, fileName: string) {

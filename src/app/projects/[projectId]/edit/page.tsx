@@ -56,7 +56,12 @@ export default async function EditPage({ params }: EditPageProps) {
         locale={locale}
       />
 
-      <TimelineEditor projectId={projectId} initialAssets={project.assets} locale={locale} />
+      <TimelineEditor
+        projectId={projectId}
+        initialAssets={project.assets}
+        initialCanvaExport={project.canvaExport}
+        locale={locale}
+      />
     </main>
   );
 }

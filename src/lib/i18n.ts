@@ -1,10 +1,12 @@
 import {
+  CANVA_SLIDESHOW_TEMPLATES,
   FRAME_STYLE_OPTIONS,
   PROMPT_OPTIONS,
   THEME_OPTIONS,
   TRANSITION_OPTIONS,
 } from "@/lib/constants";
 import type {
+  CanvaSlideshowTemplateKey,
   FrameStyleKey,
   PromptKey,
   ThemeKey,
@@ -97,4 +99,48 @@ export function getFrameStyleOptions(locale: Locale) {
 
 export function getDateTimeLocale(locale: Locale) {
   return locale === "en" ? "en-US" : "zh-HK";
+}
+
+export function getCanvaSlideshowTemplates(locale: Locale) {
+  const labels: Record<
+    CanvaSlideshowTemplateKey,
+    { name: Record<Locale, string>; description: Record<Locale, string> }
+  > = {
+    "canva-clean": {
+      name: {
+        zh: "Canva 免費範本 · 乾淨線框",
+        en: "Canva Free · Clean Frames",
+      },
+      description: {
+        zh: "節奏簡潔，留白清楚，適合家庭與日常片段。",
+        en: "Simple slide rhythm with soft spacing and neutral stroke.",
+      },
+    },
+    "canva-editorial": {
+      name: {
+        zh: "Canva 免費範本 · Editorial Story",
+        en: "Canva Free · Editorial Story",
+      },
+      description: {
+        zh: "版面偏雜誌感，文字與影像平衡。",
+        en: "Magazine-like pacing with generous whitespace.",
+      },
+    },
+    "canva-vibrant": {
+      name: {
+        zh: "Canva 免費範本 · Vibrant Motion",
+        en: "Canva Free · Vibrant Motion",
+      },
+      description: {
+        zh: "對比更強，適合活動和旅行剪輯。",
+        en: "High-contrast cover and stronger visual cadence.",
+      },
+    },
+  };
+
+  return CANVA_SLIDESHOW_TEMPLATES.map((template) => ({
+    ...template,
+    name: labels[template.key].name[locale],
+    description: labels[template.key].description[locale],
+  }));
 }

@@ -40,6 +40,19 @@ create table if not exists public.render_jobs (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.project_canva_exports (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null unique references public.projects(id) on delete cascade,
+  template_key text not null check (template_key in ('canva-clean', 'canva-editorial', 'canva-vibrant')),
+  template_name text not null,
+  status text not null default 'completed' check (status in ('idle', 'processing', 'completed', 'failed')),
+  slide_count integer not null default 0,
+  clip_urls jsonb not null default '[]'::jsonb,
+  error_message text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists idx_project_assets_project_id on public.project_assets(project_id);
 create index if not exists idx_project_assets_status on public.project_assets(project_id, generation_status);
 
@@ -81,9 +94,16 @@ before update on public.render_jobs
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists project_canva_exports_set_updated_at on public.project_canva_exports;
+create trigger project_canva_exports_set_updated_at
+before update on public.project_canva_exports
+for each row
+execute function public.set_updated_at();
+
 alter table public.projects disable row level security;
 alter table public.project_assets disable row level security;
 alter table public.render_jobs disable row level security;
+alter table public.project_canva_exports disable row level security;
 
 insert into storage.buckets (id, name, public)
 values

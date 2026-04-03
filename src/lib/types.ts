@@ -5,6 +5,12 @@ export type ProjectStatus =
   | "rendering"
   | "rendered";
 
+export type CanvaExportStatus =
+  | "idle"
+  | "processing"
+  | "completed"
+  | "failed";
+
 export type AssetGenerationStatus =
   | "uploaded"
   | "queued"
@@ -28,6 +34,11 @@ export type ThemeKey = "editorial" | "mono" | "warm" | "blueprint";
 
 export type FrameStyleKey = "none" | "single" | "double" | "offset";
 
+export type CanvaSlideshowTemplateKey =
+  | "canva-clean"
+  | "canva-editorial"
+  | "canva-vibrant";
+
 export interface PromptOption {
   key: PromptKey;
   label: string;
@@ -50,6 +61,15 @@ export interface ThemeOption {
 export interface FrameStyleOption {
   key: FrameStyleKey;
   label: string;
+}
+
+export interface CanvaSlideshowTemplate {
+  key: CanvaSlideshowTemplateKey;
+  name: string;
+  description: string;
+  accent: string;
+  surface: string;
+  createUrl: string;
 }
 
 export interface ProjectSummary {
@@ -87,6 +107,20 @@ export interface ProjectAsset {
 
 export interface ProjectDetails extends ProjectSummary {
   assets: ProjectAsset[];
+  canvaExport: ProjectCanvaExport | null;
+}
+
+export interface ProjectCanvaExport {
+  id: string;
+  projectId: string;
+  templateKey: CanvaSlideshowTemplateKey;
+  templateName: string;
+  status: CanvaExportStatus;
+  slideCount: number;
+  clipUrls: string[];
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TimelineUpdateItem {

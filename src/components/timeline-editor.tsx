@@ -27,17 +27,29 @@ import {
   THEME_OPTIONS,
 } from "@/lib/constants";
 import {
+  getCanvaSlideshowTemplates,
   getFrameStyleOptions,
   getThemeOptions,
   getTransitionOptions,
   type Locale,
 } from "@/lib/i18n";
-import type { ProjectAsset, TimelineUpdateItem } from "@/lib/types";
+import type {
+  CanvaSlideshowTemplateKey,
+  ProjectAsset,
+  ProjectCanvaExport,
+  TimelineUpdateItem,
+} from "@/lib/types";
 
 interface TimelineEditorProps {
   projectId: string;
   initialAssets: ProjectAsset[];
+  initialCanvaExport: ProjectCanvaExport | null;
   locale: Locale;
+}
+
+function isImageUrl(url: string) {
+  const normalized = url.toLowerCase();
+  return normalized.includes(".jpg") || normalized.includes(".jpeg") || normalized.includes(".png");
 }
 
 function toFfmpegColor(color: string) {
@@ -207,17 +219,25 @@ async function parseApiResponse(response: Response) {
 export function TimelineEditor({
   projectId,
   initialAssets,
+  initialCanvaExport,
   locale,
 }: TimelineEditorProps) {
   const sensors = useSensors(useSensor(PointerSensor));
+  const canvaTemplates = getCanvaSlideshowTemplates(locale);
   const transitionOptions = getTransitionOptions(locale);
   const themeOptions = getThemeOptions(locale);
   const frameStyleOptions = getFrameStyleOptions(locale);
   const [assets, setAssets] = useState(initialAssets);
+  const [canvaExport, setCanvaExport] = useState<ProjectCanvaExport | null>(initialCanvaExport);
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState<CanvaSlideshowTemplateKey>(
+    initialCanvaExport?.templateKey ?? canvaTemplates[0]?.key ?? "canva-clean",
+  );
+  const [canvaPreviewIndex, setCanvaPreviewIndex] = useState(0);
   const [selectedAssetId, setSelectedAssetId] = useState(initialAssets[0]?.id ?? null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [canvaWorking, setCanvaWorking] = useState(false);
   const [isPending, startTransition] = useTransition();
   const ffmpegRef = useRef<FFmpeg | null>(null);
   const copy =
@@ -253,6 +273,23 @@ export function TimelineEditor({
             "Regeneration opens a separate page that shows all thumbnails at once, so you can select clips and assign actions one by one.",
           openRegenerate: "Open regenerate page",
           deletePhoto: "Delete photo",
+          canvaSection: "Canva slideshow",
+          canvaTitle: "Choose a free Canva slideshow template",
+          canvaDescription:
+            "After ordering your clips, apply one template. The app maps clips into the selected slideshow layout automatically and prepares an in-app preview.",
+          applyTemplate: "Apply template",
+          applyingTemplate: "Applying...",
+          applyFailed: "Failed to apply Canva template.",
+          previewReady: "Template applied. Preview is ready.",
+          previewEmpty: "Apply a template first to preview.",
+          previewTag: "Canva preview",
+          mappedClips: (count: number) => `${count} clip(s) mapped`,
+          openCanvaTemplates: "Open Canva free templates",
+          redoCanva: "Redo",
+          redoingCanva: "Redoing...",
+          redoFailed: "Failed to redo Canva slideshow.",
+          downloadFromCanva: "Download slideshow",
+          selectTemplate: "Select template",
           horizontalTimeline: "Horizontal timeline",
           reorder: "Drag thumbnails to reorder",
           clips: (count: number) => `${count} clips`,
@@ -288,6 +325,23 @@ export function TimelineEditor({
             "重新生成會打開獨立頁面，一次過顯示所有縮圖，再逐張勾選並設定生成動作。",
           openRegenerate: "打開重新生成頁面",
           deletePhoto: "刪除相片",
+          canvaSection: "Canva slideshow",
+          canvaTitle: "選擇 Canva 免費 Slideshow 範本",
+          canvaDescription:
+            "完成排位後可套用一個範本，系統會按你的時間線順序把動態影像自動放入 slideshow，並建立 app 內 preview。",
+          applyTemplate: "套用範本",
+          applyingTemplate: "套用中...",
+          applyFailed: "套用 Canva 範本失敗。",
+          previewReady: "範本已套用，可即時 preview。",
+          previewEmpty: "先套用範本，之後會在此顯示 preview。",
+          previewTag: "Canva preview",
+          mappedClips: (count: number) => `已映射 ${count} 段片段`,
+          openCanvaTemplates: "開啟 Canva 免費範本頁",
+          redoCanva: "重做",
+          redoingCanva: "重做中...",
+          redoFailed: "重做 Canva slideshow 失敗。",
+          downloadFromCanva: "下載 slideshow",
+          selectTemplate: "選擇範本",
           horizontalTimeline: "Horizontal timeline",
           reorder: "拖動縮圖重新排序",
           clips: (count: number) => `${count} clips`,
@@ -303,6 +357,17 @@ export function TimelineEditor({
       setSelectedAssetId(assets[0]?.id ?? null);
     }
   }, [assets, selectedAssetId]);
+
+  useEffect(() => {
+    if (!canvaExport) {
+      setCanvaPreviewIndex(0);
+      return;
+    }
+
+    if (canvaPreviewIndex >= canvaExport.clipUrls.length) {
+      setCanvaPreviewIndex(0);
+    }
+  }, [canvaExport, canvaPreviewIndex]);
 
   const selectedAsset =
     assets.find((asset) => asset.id === selectedAssetId) ?? assets[0] ?? null;
@@ -352,6 +417,7 @@ export function TimelineEditor({
     const newIndex = assets.findIndex((asset) => asset.id === over.id);
     const nextAssets = arrayMove(assets, oldIndex, newIndex);
     setAssets(nextAssets);
+    setCanvaExport(null);
     persistTimeline(nextAssets, copy.sortedSaved);
   }
 
@@ -379,6 +445,60 @@ export function TimelineEditor({
     persistTimeline(assets);
   }
 
+  async function applyCanvaTemplate() {
+    setError(null);
+    setStatusMessage(null);
+    setCanvaWorking(true);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/canva/compose`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          templateKey: selectedTemplateKey,
+          orderedAssetIds: assets.map((asset) => asset.id),
+        }),
+      });
+      const data = await parseApiResponse(response);
+
+      if (!response.ok) {
+        setError(data.error ?? copy.applyFailed);
+        return;
+      }
+
+      setCanvaExport((data as { canvaExport?: ProjectCanvaExport }).canvaExport ?? null);
+      setCanvaPreviewIndex(0);
+      setStatusMessage(copy.previewReady);
+    } finally {
+      setCanvaWorking(false);
+    }
+  }
+
+  async function resetCanvaTemplate() {
+    setError(null);
+    setStatusMessage(null);
+    setCanvaWorking(true);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/canva/reset`, {
+        method: "POST",
+      });
+      const data = await parseApiResponse(response);
+
+      if (!response.ok) {
+        setError(data.error ?? copy.redoFailed);
+        return;
+      }
+
+      setCanvaExport(null);
+      setCanvaPreviewIndex(0);
+    } finally {
+      setCanvaWorking(false);
+    }
+  }
+
   async function deleteClip() {
     if (!selectedAsset) {
       return;
@@ -402,6 +522,7 @@ export function TimelineEditor({
     }
 
     setAssets((current) => current.filter((asset) => asset.id !== selectedAsset.id));
+    setCanvaExport(null);
     setStatusMessage(copy.deleted);
   }
 
@@ -508,6 +629,12 @@ export function TimelineEditor({
 
   const selectedTheme =
     THEME_OPTIONS.find((item) => item.key === selectedAsset.themeKey) ?? THEME_OPTIONS[0];
+  const selectedCanvaTemplate =
+    canvaTemplates.find((item) => item.key === selectedTemplateKey) ?? canvaTemplates[0];
+  const canvaPreviewUrl =
+    canvaExport?.clipUrls[canvaPreviewIndex] ??
+    canvaExport?.clipUrls[0] ??
+    null;
 
   return (
     <div className="grid gap-8">
@@ -708,6 +835,142 @@ export function TimelineEditor({
               </div>
             </SortableContext>
           </DndContext>
+        </div>
+      </section>
+
+      <section className="grid gap-5 border border-[var(--line)] p-5">
+        <div className="grid gap-3">
+          <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
+            {copy.canvaSection}
+          </p>
+          <h3 className="text-2xl tracking-tight">{copy.canvaTitle}</h3>
+          <p className="max-w-4xl text-sm leading-7 text-[var(--muted)]">
+            {copy.canvaDescription}
+          </p>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="grid gap-4">
+            <div className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+              <span>{copy.selectTemplate}</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {canvaTemplates.map((template) => {
+                const active = template.key === selectedTemplateKey;
+                return (
+                  <button
+                    key={template.key}
+                    type="button"
+                    className={`grid gap-3 border p-4 text-left transition ${
+                      active ? "border-[var(--text)] bg-[var(--surface-soft)]" : "border-[var(--line)]"
+                    }`}
+                    onClick={() => setSelectedTemplateKey(template.key)}
+                  >
+                    <div
+                      className="h-24 border"
+                      style={{
+                        borderColor: template.accent,
+                        backgroundColor: template.surface,
+                      }}
+                    />
+                    <div className="grid gap-1">
+                      <div className="text-sm tracking-tight">{template.name}</div>
+                      <div className="text-xs leading-6 text-[var(--muted)]">{template.description}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="h-11 border border-[var(--text)] px-4 text-xs uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)] disabled:cursor-not-allowed disabled:border-[var(--line)] disabled:text-[var(--muted)]"
+                onClick={applyCanvaTemplate}
+                disabled={canvaWorking || assets.length === 0}
+              >
+                {canvaWorking ? copy.applyingTemplate : copy.applyTemplate}
+              </button>
+              {selectedCanvaTemplate ? (
+                <a
+                  href={selectedCanvaTemplate.createUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-11 items-center justify-center border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
+                >
+                  {copy.openCanvaTemplates}
+                </a>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="grid gap-4 border border-[var(--line)] p-4">
+            <div className="flex items-center justify-between text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+              <span>{copy.previewTag}</span>
+              {canvaExport ? <span>{copy.mappedClips(canvaExport.slideCount)}</span> : null}
+            </div>
+            <div className="grid min-h-[220px] place-items-center border border-[var(--line)] bg-[var(--surface-soft)] p-3">
+              {canvaPreviewUrl ? (
+                isImageUrl(canvaPreviewUrl) ? (
+                  <img
+                    src={canvaPreviewUrl}
+                    alt="Canva preview"
+                    className="aspect-video w-full border border-[var(--line)] object-cover"
+                  />
+                ) : (
+                  <video
+                    key={canvaPreviewUrl}
+                    src={canvaPreviewUrl}
+                    className="aspect-video w-full border border-[var(--line)] object-cover"
+                    controls
+                  />
+                )
+              ) : (
+                <p className="text-sm text-[var(--muted)]">{copy.previewEmpty}</p>
+              )}
+            </div>
+            {canvaExport ? (
+              <>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {canvaExport.clipUrls.map((url, index) => (
+                    <button
+                      key={`${url}-${index}`}
+                      type="button"
+                      className={`min-w-20 border p-1 transition ${
+                        canvaPreviewIndex === index
+                          ? "border-[var(--text)]"
+                          : "border-[var(--line)]"
+                      }`}
+                      onClick={() => setCanvaPreviewIndex(index)}
+                    >
+                      {isImageUrl(url) ? (
+                        <img src={url} alt={`Preview ${index + 1}`} className="h-12 w-full object-cover" />
+                      ) : (
+                        <video src={url} className="h-12 w-full object-cover" muted />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    className="h-10 border border-[var(--text)] px-4 text-xs uppercase tracking-[0.2em] transition hover:bg-[var(--text)] hover:text-[var(--surface)]"
+                    onClick={exportVideo}
+                    disabled={exporting}
+                  >
+                    {exporting ? copy.exporting : copy.downloadFromCanva}
+                  </button>
+                <button
+                  type="button"
+                  className="h-10 border border-[var(--line)] px-4 text-xs uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
+                  onClick={resetCanvaTemplate}
+                  disabled={canvaWorking}
+                >
+                  {canvaWorking ? copy.redoingCanva : copy.redoCanva}
+                </button>
+              </div>
+              </>
+            ) : null}
+          </div>
         </div>
       </section>
 
