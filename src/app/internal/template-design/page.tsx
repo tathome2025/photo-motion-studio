@@ -12,8 +12,8 @@ export default async function TemplateDesignPage() {
         <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">Internal</p>
         <h1 className="text-4xl tracking-[-0.05em]">Template Design</h1>
         <p className="max-w-3xl text-sm leading-7 text-[var(--muted)]">
-          Internal template editor. End users only choose one of these presets from the style
-          page.
+          Internal visual editor. You can tune Theme, Frame, and Transition in a live stage
+          preview before saving each template.
         </p>
       </section>
 
