@@ -12,6 +12,8 @@ const paramsSchema = z.object({
     "cinematic",
     "ocean-drift",
     "night-pulse",
+    "sunset-ribbon",
+    "silver-noise",
   ]),
 });
 

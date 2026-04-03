@@ -4,10 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { DEFAULT_MUSIC_TRACK_KEY } from "@/lib/constants";
-import { getMusicTrackOptions, type Locale } from "@/lib/i18n";
+import { type Locale } from "@/lib/i18n";
 import type {
-  MusicTrackKey,
   ProjectTemplateConfig,
   StudioTemplateKey,
   StudioTemplatePreset,
@@ -41,40 +39,34 @@ export function TemplateMusicSelector({
   locale,
 }: TemplateMusicSelectorProps) {
   const router = useRouter();
-  const musicOptions = getMusicTrackOptions(locale);
   const [selectedTemplate, setSelectedTemplate] = useState<StudioTemplateKey>(
     initialTemplateConfig?.templateKey ?? templateOptions[0].key,
-  );
-  const [selectedMusic, setSelectedMusic] = useState<MusicTrackKey>(
-    initialTemplateConfig?.musicKey ?? DEFAULT_MUSIC_TRACK_KEY,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const copy =
     locale === "en"
       ? {
-          title: "Choose template and music",
+          title: "Choose background theme",
           description:
-            "After ordering clips, choose one of the 6 background themes and one music track. Output will place your 1344x756 content video centered on a 1920x1080 theme background.",
+            "After ordering clips, choose one of the 8 background themes. The selected background video already contains music.",
           backToEdit: "Back to timeline",
           applyAndContinue: "Render preview",
           applying: "Preparing...",
           templateLabel: "Template",
-          musicLabel: "Music",
           clipCount: (count: number) => `${count} clips in timeline`,
-          failed: "Failed to save template and music.",
+          failed: "Failed to save selected background theme.",
         }
       : {
-          title: "選擇模板與音樂",
+          title: "選擇背景主題",
           description:
-            "完成排位後，請在 6 款背景主題中選 1 款，再選 1 首背景音樂。輸出時會把 1344x756 內容影片置中疊在 1920x1080 背景影片。",
+            "完成排位後，請在 8 款背景主題中選 1 款。背景影片本身已包含音樂。",
           backToEdit: "返回時間線",
           applyAndContinue: "前往渲染預覽",
           applying: "準備中...",
           templateLabel: "模板",
-          musicLabel: "音樂",
           clipCount: (count: number) => `時間線共 ${count} 段片段`,
-          failed: "儲存模板與音樂失敗。",
+          failed: "儲存背景主題失敗。",
         };
 
   async function handleContinue() {
@@ -89,7 +81,6 @@ export function TemplateMusicSelector({
         },
         body: JSON.stringify({
           templateKey: selectedTemplate,
-          musicKey: selectedMusic,
           applyToAllAssets: false,
         }),
       });
@@ -120,58 +111,34 @@ export function TemplateMusicSelector({
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-        <div className="grid gap-3">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-            {copy.templateLabel}
-          </p>
-          <div className="grid gap-3">
-            {templateOptions.map((template) => (
-              <button
-                key={template.key}
-                type="button"
-                className={`grid gap-1 border px-4 py-3 text-left transition ${
-                  selectedTemplate === template.key
-                    ? "border-[var(--text)] bg-[var(--surface-soft)]"
-                    : "border-[var(--line)] hover:border-[var(--text)]"
-                }`}
-                onClick={() => setSelectedTemplate(template.key)}
-              >
-                <span className="text-sm uppercase tracking-[0.18em]">{template.label}</span>
-                <span className="text-sm text-[var(--muted)]">{template.description}</span>
-                <video
-                  src={template.backgroundVideoPath}
-                  className="mt-1 aspect-video w-full border border-[var(--line)] object-cover"
-                  muted
-                  autoPlay
-                  loop
-                  playsInline
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid gap-3">
-          <label className="grid gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-            {copy.musicLabel}
-            <select
-              className="h-12 border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--text)] outline-none"
-              value={selectedMusic}
-              onChange={(event) => setSelectedMusic(event.target.value as MusicTrackKey)}
+      <div className="grid gap-3">
+        <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+          {copy.templateLabel}
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {templateOptions.map((template) => (
+            <button
+              key={template.key}
+              type="button"
+              className={`grid gap-1 border px-3 py-3 text-left transition ${
+                selectedTemplate === template.key
+                  ? "border-[var(--text)] bg-[var(--surface-soft)]"
+                  : "border-[var(--line)] hover:border-[var(--text)]"
+              }`}
+              onClick={() => setSelectedTemplate(template.key)}
             >
-              {musicOptions.map((music) => (
-                <option key={music.key} value={music.key}>
-                  {music.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className="text-sm text-[var(--muted)]">
-            {locale === "en"
-              ? "Put 10 MP3 files under /public/music with names track-01.mp3 ... track-10.mp3."
-              : "請把 10 首 MP3 放在 /public/music，檔名為 track-01.mp3 至 track-10.mp3。"}
-          </p>
+              <span className="text-sm uppercase tracking-[0.18em]">{template.label}</span>
+              <span className="text-sm text-[var(--muted)]">{template.description}</span>
+              <video
+                src={template.backgroundVideoPath}
+                className="mt-1 aspect-video w-full border border-[var(--line)] object-cover"
+                muted
+                autoPlay
+                loop
+                playsInline
+              />
+            </button>
+          ))}
         </div>
       </div>
 

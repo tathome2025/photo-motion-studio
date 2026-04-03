@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { MUSIC_TRACK_OPTIONS } from "@/lib/constants";
 import { renderVideoPreview } from "@/lib/client-render";
 import type { Locale } from "@/lib/i18n";
 import type {
@@ -32,7 +31,6 @@ export function RenderPreviewPanel({
   const [isRendering, setIsRendering] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const musicTrack = MUSIC_TRACK_OPTIONS.find((track) => track.key === templateConfig.musicKey);
   const playableAssets = useMemo(
     () => assets.filter((asset) => asset.generationStatus === "completed"),
     [assets],
@@ -42,7 +40,7 @@ export function RenderPreviewPanel({
       ? {
           title: "Rendered preview",
           description:
-            "The full video is rendered in your browser using 2.5s clips over a 1920x1080 theme background with music and black fade in/out.",
+            "The full video is rendered in your browser using 2.5s clips over a 1920x1080 theme background with black fade in/out.",
           backSetup: "Back to template setup",
           rerender: "Render again",
           rendering: "Rendering video...",
@@ -50,13 +48,12 @@ export function RenderPreviewPanel({
           empty: "No completed clips available for preview.",
           failed: "Render failed.",
           template: "Template",
-          music: "Music",
           clips: (count: number) => `${count} clips`,
         }
       : {
           title: "渲染預覽",
           description:
-            "系統會把每段片段統一成 2.5 秒，疊在 1920x1080 主題背景上，再加音樂及黑場淡入淡出完成渲染。",
+            "系統會把每段片段統一成 2.5 秒，疊在 1920x1080 主題背景上，並加上黑場淡入淡出完成渲染。",
           backSetup: "返回模板設定",
           rerender: "重新渲染",
           rendering: "影片渲染中...",
@@ -64,7 +61,6 @@ export function RenderPreviewPanel({
           empty: "沒有可預覽的已完成片段。",
           failed: "渲染失敗。",
           template: "模板",
-          music: "音樂",
           clips: (count: number) => `${count} 段片段`,
         };
 
@@ -91,7 +87,6 @@ export function RenderPreviewPanel({
         const blob = await renderVideoPreview({
           assets: playableAssets,
           backgroundVideoPath: templatePreset.backgroundVideoPath,
-          musicFilePath: musicTrack?.filePath ?? null,
         });
 
         if (cancelled) {
@@ -123,7 +118,6 @@ export function RenderPreviewPanel({
     };
   }, [
     copy.failed,
-    musicTrack?.filePath,
     playableAssets,
     templatePreset.backgroundVideoPath,
   ]);
@@ -151,7 +145,6 @@ export function RenderPreviewPanel({
       const blob = await renderVideoPreview({
         assets: playableAssets,
         backgroundVideoPath: templatePreset.backgroundVideoPath,
-        musicFilePath: musicTrack?.filePath ?? null,
       });
 
       setPreviewUrl((current) => {
@@ -176,13 +169,9 @@ export function RenderPreviewPanel({
         <p className="max-w-3xl text-sm leading-7 text-[var(--muted)]">{copy.description}</p>
       </div>
 
-      <div className="grid gap-2 text-sm text-[var(--muted)] md:grid-cols-3">
+      <div className="grid gap-2 text-sm text-[var(--muted)] md:grid-cols-2">
         <div>
           {copy.template}: <span className="text-[var(--text)]">{templateConfig.templateName}</span>
-        </div>
-        <div>
-          {copy.music}:{" "}
-          <span className="text-[var(--text)]">{musicTrack?.label ?? templateConfig.musicKey}</span>
         </div>
         <div>
           {copy.clips(playableAssets.length)}

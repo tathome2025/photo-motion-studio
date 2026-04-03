@@ -42,8 +42,8 @@ export default async function EditPage({ params }: EditPageProps) {
             <h1 className="text-4xl tracking-[-0.05em]">{project.name}</h1>
             <p className="max-w-2xl text-sm leading-7 text-[var(--muted)]">
               {locale === "en"
-                ? "Completed motion clips are already placed on the timeline. Reorder clips first, then move to template and music selection."
-                : "所有已完成的動態片段都已放進時間線。先完成排序，再進入模板及音樂選擇。"}
+                ? "Completed motion clips are already placed on the timeline. Reorder clips first, then move to background theme selection."
+                : "所有已完成的動態片段都已放進時間線。先完成排序，再進入背景主題選擇。"}
             </p>
           </div>
           <DeleteProjectButton projectId={projectId} locale={locale} />

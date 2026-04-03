@@ -133,7 +133,7 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           backHome: "Back home",
           saving: "Saving...",
           saveTimeline: "Save timeline",
-          nextStep: "Next: Template & Music",
+          nextStep: "Next: Background Theme",
           preview: "Preview",
           selectedClip: "Selected clip",
           regenerationCount: (count: number) =>
@@ -159,7 +159,7 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           backHome: "返回首頁",
           saving: "儲存中...",
           saveTimeline: "儲存時間線",
-          nextStep: "下一步：選模板與音樂",
+          nextStep: "下一步：選背景主題",
           preview: "Preview",
           selectedClip: "Selected clip",
           regenerationCount: (count: number) =>

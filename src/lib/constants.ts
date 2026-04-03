@@ -100,6 +100,24 @@ export const STUDIO_TEMPLATE_PRESETS: StudioTemplatePreset[] = [
     themeKey: "mono",
     frameStyleKey: "single",
   },
+  {
+    key: "sunset-ribbon",
+    label: "Sunset Ribbon",
+    description: "Sunset gradient ribbons for warm cinematic pacing.",
+    backgroundVideoPath: "/background-themes/theme-07.mp4",
+    transitionKey: "slideup",
+    themeKey: "warm",
+    frameStyleKey: "offset",
+  },
+  {
+    key: "silver-noise",
+    label: "Silver Noise",
+    description: "Neutral monochrome movement with subtle grain.",
+    backgroundVideoPath: "/background-themes/theme-08.mp4",
+    transitionKey: "wipeleft",
+    themeKey: "mono",
+    frameStyleKey: "double",
+  },
 ];
 
 export const MUSIC_TRACK_OPTIONS: MusicTrackOption[] = [

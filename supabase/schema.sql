@@ -57,7 +57,7 @@ create table if not exists public.project_canva_exports (
 create table if not exists public.project_template_configs (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null unique references public.projects(id) on delete cascade,
-  template_key text not null check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic', 'ocean-drift', 'night-pulse')),
+  template_key text not null check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic', 'ocean-drift', 'night-pulse', 'sunset-ribbon', 'silver-noise')),
   template_name text not null,
   music_key text not null check (music_key in ('track-01', 'track-02', 'track-03', 'track-04', 'track-05', 'track-06', 'track-07', 'track-08', 'track-09', 'track-10')),
   default_transition_key text not null check (default_transition_key in ('cut', 'fade', 'wipeleft', 'slideup')),
@@ -68,7 +68,7 @@ create table if not exists public.project_template_configs (
 );
 
 create table if not exists public.template_presets (
-  template_key text primary key check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic', 'ocean-drift', 'night-pulse')),
+  template_key text primary key check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic', 'ocean-drift', 'night-pulse', 'sunset-ribbon', 'silver-noise')),
   label text not null,
   description text not null,
   background_video_path text not null,
@@ -105,7 +105,7 @@ alter table public.project_template_configs
 
 alter table public.project_template_configs
   add constraint project_template_configs_template_key_check
-  check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic', 'ocean-drift', 'night-pulse'));
+  check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic', 'ocean-drift', 'night-pulse', 'sunset-ribbon', 'silver-noise'));
 
 alter table public.project_template_configs
   drop constraint if exists project_template_configs_music_key_check;
@@ -128,7 +128,7 @@ alter table public.template_presets
 
 alter table public.template_presets
   add constraint template_presets_template_key_check
-  check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic', 'ocean-drift', 'night-pulse'));
+  check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic', 'ocean-drift', 'night-pulse', 'sunset-ribbon', 'silver-noise'));
 
 alter table public.template_presets
   drop constraint if exists template_presets_transition_key_check;
@@ -251,5 +251,7 @@ values
   ('spotlight', 'Warm Grain', 'Warm film-grain style for emotional memory edits.', '/background-themes/theme-03.mp4', 'wipeleft', 'warm', 'double', 3),
   ('cinematic', 'Neo Grid', 'Structured geometric motion background for dynamic cuts.', '/background-themes/theme-04.mp4', 'slideup', 'blueprint', 'offset', 4),
   ('ocean-drift', 'Ocean Drift', 'Cool ocean flow background for calm pacing.', '/background-themes/theme-05.mp4', 'cut', 'editorial', 'none', 5),
-  ('night-pulse', 'Night Pulse', 'Dark ambient pulse background for stronger contrast.', '/background-themes/theme-06.mp4', 'fade', 'mono', 'single', 6)
+  ('night-pulse', 'Night Pulse', 'Dark ambient pulse background for stronger contrast.', '/background-themes/theme-06.mp4', 'fade', 'mono', 'single', 6),
+  ('sunset-ribbon', 'Sunset Ribbon', 'Sunset gradient ribbons for warm cinematic pacing.', '/background-themes/theme-07.mp4', 'slideup', 'warm', 'offset', 7),
+  ('silver-noise', 'Silver Noise', 'Neutral monochrome movement with subtle grain.', '/background-themes/theme-08.mp4', 'wipeleft', 'mono', 'double', 8)
 on conflict (template_key) do nothing;

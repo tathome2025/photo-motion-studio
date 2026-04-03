@@ -146,6 +146,20 @@ export function getStudioTemplateOptions(locale: Locale) {
         en: "Dark ambient pulse background with strong contrast.",
       },
     },
+    "sunset-ribbon": {
+      label: { zh: "日落絲帶", en: "Sunset Ribbon" },
+      description: {
+        zh: "日落漸層絲帶背景，節奏更有電影感。",
+        en: "Sunset gradient ribbons with cinematic pacing.",
+      },
+    },
+    "silver-noise": {
+      label: { zh: "銀調噪點", en: "Silver Noise" },
+      description: {
+        zh: "中性銀灰動態背景，帶細緻顆粒感。",
+        en: "Neutral silver motion background with subtle grain.",
+      },
+    },
   };
 
   return STUDIO_TEMPLATE_PRESETS.map((template) => ({

@@ -15,6 +15,8 @@ const payloadSchema = z.object({
     "cinematic",
     "ocean-drift",
     "night-pulse",
+    "sunset-ribbon",
+    "silver-noise",
   ]),
   musicKey: z
     .enum([

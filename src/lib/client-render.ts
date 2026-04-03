@@ -45,7 +45,6 @@ function buildConcatFilter(totalClips: number) {
 export async function renderVideoPreview(input: {
   assets: ProjectAsset[];
   backgroundVideoPath: string;
-  musicFilePath?: string | null;
 }) {
   const ffmpeg = await ensureFfmpegLoaded();
   const args: string[] = ["-y"];
@@ -83,24 +82,6 @@ export async function renderVideoPreview(input: {
   args.push("-stream_loop", "-1", "-i", "background.mp4");
   const backgroundInputIndex = playableAssets.length;
 
-  let hasAudioTrack = false;
-  let audioInputIndex = -1;
-
-  if (input.musicFilePath) {
-    try {
-      const musicResponse = await fetch(input.musicFilePath, { cache: "no-store" });
-      if (musicResponse.ok) {
-        const musicBytes = new Uint8Array(await musicResponse.arrayBuffer());
-        await ffmpeg.writeFile("music.mp3", musicBytes);
-        args.push("-stream_loop", "-1", "-i", "music.mp3");
-        hasAudioTrack = true;
-        audioInputIndex = playableAssets.length + 1;
-      }
-    } catch {
-      hasAudioTrack = false;
-    }
-  }
-
   const totalDuration = playableAssets.length * CLIP_DURATION_SECONDS;
   const fadeOutStart = Math.max(totalDuration - FADE_SECONDS, 0);
   const clipFilters = playableAssets.map((asset, index) =>
@@ -123,21 +104,14 @@ export async function renderVideoPreview(input: {
     "yuv420p",
     "-movflags",
     "+faststart",
+    "-map",
+    `${backgroundInputIndex}:a?`,
+    "-c:a",
+    "aac",
+    "-b:a",
+    "192k",
+    "-shortest",
   ];
-
-  if (hasAudioTrack && audioInputIndex >= 0) {
-    outputArgs.push(
-      "-map",
-      `${audioInputIndex}:a`,
-      "-c:a",
-      "aac",
-      "-b:a",
-      "192k",
-      "-shortest",
-    );
-  } else {
-    outputArgs.push("-an");
-  }
 
   outputArgs.push("preview-output.mp4");
   await ffmpeg.exec(outputArgs);

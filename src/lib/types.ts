@@ -40,7 +40,9 @@ export type StudioTemplateKey =
   | "spotlight"
   | "cinematic"
   | "ocean-drift"
-  | "night-pulse";
+  | "night-pulse"
+  | "sunset-ribbon"
+  | "silver-noise";
 export type MusicTrackKey =
   | "track-01"
   | "track-02"
