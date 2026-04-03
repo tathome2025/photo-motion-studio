@@ -62,6 +62,25 @@ alter table public.project_assets
   add column if not exists is_static_clip boolean not null default false;
 
 alter table public.project_assets drop constraint if exists project_assets_prompt_key_check;
+
+update public.project_assets
+set
+  prompt_key = case
+    when prompt_key in ('smile', 'greeting', 'laughing', 'handshake', 'hugging', 'blow-a-kiss', 'custom', 'static') then prompt_key
+    when prompt_key = 'brotherhood' then 'hugging'
+    else null
+  end,
+  prompt_label = case
+    when prompt_key = 'brotherhood' then '擁抱 Hugging'
+    when prompt_key in ('smile', 'greeting', 'laughing', 'handshake', 'hugging', 'blow-a-kiss', 'custom', 'static') then prompt_label
+    else null
+  end,
+  custom_prompt = case
+    when prompt_key = 'custom' then custom_prompt
+    else null
+  end
+where prompt_key is not null;
+
 alter table public.project_assets
   add constraint project_assets_prompt_key_check
   check (prompt_key in ('smile', 'greeting', 'laughing', 'handshake', 'hugging', 'blow-a-kiss', 'custom', 'static'));
