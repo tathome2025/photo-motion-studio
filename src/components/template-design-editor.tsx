@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import {
   FRAME_STYLE_OPTIONS,
@@ -93,6 +93,118 @@ function MiniThemeCard({ template }: { template: StudioTemplatePreset }) {
         <span className="h-2 border" style={{ borderColor: theme.border, backgroundColor: theme.border }} />
         <span className="h-2 border" style={{ borderColor: theme.border, backgroundColor: theme.text }} />
       </div>
+    </div>
+  );
+}
+
+function TransitionStagePreview({
+  template,
+  theme,
+}: {
+  template: StudioTemplatePreset;
+  theme: (typeof THEME_OPTIONS)[number];
+}) {
+  const [phase, setPhase] = useState(false);
+
+  useEffect(() => {
+    let timerA = 0;
+    let timerB = 0;
+
+    function play() {
+      setPhase(false);
+      timerA = window.setTimeout(() => setPhase(true), 120);
+    }
+
+    play();
+    timerB = window.setInterval(play, 2400);
+
+    return () => {
+      window.clearTimeout(timerA);
+      window.clearInterval(timerB);
+    };
+  }, [template.transitionKey, template.themeKey, template.frameStyleKey]);
+
+  const firstStyle: CSSProperties = {
+    transition: "opacity 800ms ease",
+    opacity: template.transitionKey === "cut" ? (phase ? 0 : 1) : 1,
+  };
+
+  const secondStyle: CSSProperties = {
+    transition: "opacity 900ms ease, transform 900ms ease, clip-path 900ms ease",
+    opacity: phase ? 1 : 0,
+    transform: "translateY(0%)",
+    clipPath: "inset(0 0 0 0)",
+  };
+
+  if (template.transitionKey === "cut") {
+    secondStyle.transition = "none";
+    secondStyle.opacity = phase ? 1 : 0;
+  } else if (template.transitionKey === "fade") {
+    secondStyle.opacity = phase ? 1 : 0;
+  } else if (template.transitionKey === "wipeleft") {
+    secondStyle.opacity = 1;
+    secondStyle.clipPath = phase ? "inset(0 0% 0 0)" : "inset(0 100% 0 0)";
+  } else if (template.transitionKey === "slideup") {
+    secondStyle.opacity = 1;
+    secondStyle.transform = phase ? "translateY(0%)" : "translateY(100%)";
+  }
+
+  return (
+    <div className="relative h-full w-full overflow-hidden border" style={{ borderColor: theme.border }}>
+      <div className="absolute inset-0 p-5" style={firstStyle}>
+        <div
+          className="grid h-full grid-rows-[1fr_auto] gap-3 border p-3"
+          style={{ borderColor: theme.border }}
+        >
+          <div
+            className="border"
+            style={{
+              borderColor: theme.border,
+              background:
+                "linear-gradient(130deg, rgba(0,0,0,0.08) 0%, rgba(255,255,255,0.28) 100%)",
+            }}
+          />
+          <div className="grid gap-1">
+            <span className="h-2 border" style={{ borderColor: theme.border, backgroundColor: theme.border }} />
+            <span className="h-2 border" style={{ borderColor: theme.border }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute inset-0 p-5" style={secondStyle}>
+        <div
+          className="grid h-full grid-cols-[0.75fr_1.25fr] gap-3 border p-3"
+          style={{ borderColor: theme.border }}
+        >
+          <div
+            className="border"
+            style={{
+              borderColor: theme.border,
+              background:
+                "linear-gradient(130deg, rgba(255,255,255,0.28) 0%, rgba(0,0,0,0.14) 100%)",
+            }}
+          />
+          <div className="grid gap-2">
+            <span
+              className="h-2 border"
+              style={{ borderColor: theme.border, backgroundColor: theme.background }}
+            />
+            <span
+              className="h-2 border"
+              style={{ borderColor: theme.border, backgroundColor: theme.border }}
+            />
+            <span className="h-2 border" style={{ borderColor: theme.border }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="pointer-events-none absolute left-3 top-3 border px-2 py-1 text-[10px] uppercase tracking-[0.14em]" style={{ borderColor: theme.border, color: theme.text, backgroundColor: `${theme.background}E6` }}>
+        {getTransitionLabel(template.transitionKey)}
+      </div>
+      <div className="pointer-events-none absolute bottom-3 right-3 border px-2 py-1 text-[10px] uppercase tracking-[0.14em]" style={{ borderColor: theme.border, color: theme.text, backgroundColor: `${theme.background}E6` }}>
+        Theme + Frame Preview
+      </div>
+      <FrameOverlay frameStyleKey={template.frameStyleKey} color={theme.border} />
     </div>
   );
 }
@@ -231,38 +343,7 @@ export function TemplateDesignEditor({ initialTemplates }: TemplateDesignEditorP
               background: `linear-gradient(135deg, ${activeTheme.background} 0%, #ffffff 100%)`,
             }}
           >
-            <div className="absolute inset-0 grid grid-cols-[1.3fr_0.8fr] gap-3 p-5">
-              <div className="grid grid-rows-[1fr_auto] gap-3 border p-3" style={{ borderColor: activeTheme.border }}>
-                <div
-                  className="border"
-                  style={{
-                    borderColor: activeTheme.border,
-                    background:
-                      "linear-gradient(145deg, rgba(0,0,0,0.06) 0%, rgba(255,255,255,0.22) 100%)",
-                  }}
-                />
-                <div className="grid gap-1">
-                  <span
-                    className="h-2 border"
-                    style={{ borderColor: activeTheme.border, backgroundColor: activeTheme.border }}
-                  />
-                  <span className="h-2 border" style={{ borderColor: activeTheme.border }} />
-                </div>
-              </div>
-              <div className="grid gap-3">
-                <div className="border p-2" style={{ borderColor: activeTheme.border }}>
-                  <span className="text-[10px] uppercase tracking-[0.12em]" style={{ color: activeTheme.text }}>
-                    {getTransitionLabel(activeTemplate.transitionKey)}
-                  </span>
-                </div>
-                <div className="border p-2" style={{ borderColor: activeTheme.border }}>
-                  <span className="text-[10px] uppercase tracking-[0.12em]" style={{ color: activeTheme.text }}>
-                    {activeTheme.label}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <FrameOverlay frameStyleKey={activeTemplate.frameStyleKey} color={activeTheme.border} />
+            <TransitionStagePreview template={activeTemplate} theme={activeTheme} />
           </div>
 
           <div className="grid gap-2 border border-[var(--line)] p-3">
