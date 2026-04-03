@@ -1,6 +1,8 @@
 import type {
   FrameStyleOption,
+  MusicTrackOption,
   PromptOption,
+  StudioTemplatePreset,
   ThemeOption,
   TransitionOption,
 } from "@/lib/types";
@@ -43,8 +45,57 @@ export const FRAME_STYLE_OPTIONS: FrameStyleOption[] = [
   { key: "offset", label: "Offset" },
 ];
 
+export const STUDIO_TEMPLATE_PRESETS: StudioTemplatePreset[] = [
+  {
+    key: "clean-cut",
+    label: "Clean Cut",
+    description: "Minimal line styling for direct storytelling.",
+    transitionKey: "cut",
+    themeKey: "editorial",
+    frameStyleKey: "none",
+  },
+  {
+    key: "magazine",
+    label: "Magazine Grid",
+    description: "Editorial look with gentle fades and slim frames.",
+    transitionKey: "fade",
+    themeKey: "mono",
+    frameStyleKey: "single",
+  },
+  {
+    key: "spotlight",
+    label: "Spotlight",
+    description: "Warmer framing with stronger motion transitions.",
+    transitionKey: "wipeleft",
+    themeKey: "warm",
+    frameStyleKey: "double",
+  },
+  {
+    key: "cinematic",
+    label: "Cinematic Motion",
+    description: "Blueprint tones with dramatic slide transitions.",
+    transitionKey: "slideup",
+    themeKey: "blueprint",
+    frameStyleKey: "offset",
+  },
+];
+
+export const MUSIC_TRACK_OPTIONS: MusicTrackOption[] = [
+  { key: "track-01", label: "Track 01", filePath: "/music/track-01.mp3" },
+  { key: "track-02", label: "Track 02", filePath: "/music/track-02.mp3" },
+  { key: "track-03", label: "Track 03", filePath: "/music/track-03.mp3" },
+  { key: "track-04", label: "Track 04", filePath: "/music/track-04.mp3" },
+  { key: "track-05", label: "Track 05", filePath: "/music/track-05.mp3" },
+  { key: "track-06", label: "Track 06", filePath: "/music/track-06.mp3" },
+  { key: "track-07", label: "Track 07", filePath: "/music/track-07.mp3" },
+  { key: "track-08", label: "Track 08", filePath: "/music/track-08.mp3" },
+  { key: "track-09", label: "Track 09", filePath: "/music/track-09.mp3" },
+  { key: "track-10", label: "Track 10", filePath: "/music/track-10.mp3" },
+];
+
 export const DEFAULT_THEME_KEY = "editorial";
 export const DEFAULT_TRANSITION_KEY = "fade";
 export const DEFAULT_FRAME_STYLE_KEY = "single";
 export const DEFAULT_CLIP_DURATION = 5;
 export const MAX_REGENERATION_COUNT = 3;
+export const DEFAULT_MUSIC_TRACK_KEY = "track-01";

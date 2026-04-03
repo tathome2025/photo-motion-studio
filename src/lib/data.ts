@@ -1,9 +1,12 @@
 import crypto from "node:crypto";
 
 import {
+  DEFAULT_MUSIC_TRACK_KEY,
   DEFAULT_CLIP_DURATION,
   GENERATED_BUCKET,
   MAX_REGENERATION_COUNT,
+  MUSIC_TRACK_OPTIONS,
+  STUDIO_TEMPLATE_PRESETS,
 } from "@/lib/constants";
 import { getPromptLabel, slugifyFileName } from "@/lib/utils";
 import { assertSupabaseAdmin, getSupabaseAdmin } from "@/lib/supabase";
@@ -14,7 +17,10 @@ import type {
   ProjectDetails,
   ProjectStatus,
   ProjectSummary,
+  ProjectTemplateConfig,
+  MusicTrackKey,
   PromptKey,
+  StudioTemplateKey,
   TimelineUpdateItem,
   CanvaExportStatus,
 } from "@/lib/types";
@@ -64,6 +70,19 @@ type ProjectCanvaExportRow = {
   updated_at: string;
 };
 
+type ProjectTemplateConfigRow = {
+  id: string;
+  project_id: string;
+  template_key: StudioTemplateKey;
+  template_name: string;
+  music_key: MusicTrackKey | null;
+  default_transition_key: ProjectTemplateConfig["defaultTransitionKey"];
+  default_theme_key: ProjectTemplateConfig["defaultThemeKey"];
+  default_frame_style_key: ProjectTemplateConfig["defaultFrameStyleKey"];
+  created_at: string;
+  updated_at: string;
+};
+
 function mapAsset(row: AssetRow): ProjectAsset {
   return {
     id: row.id,
@@ -102,6 +121,21 @@ function mapCanvaExport(row: ProjectCanvaExportRow): ProjectCanvaExport {
       ? row.clip_urls.filter((item): item is string => typeof item === "string")
       : [],
     errorMessage: row.error_message,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapTemplateConfig(row: ProjectTemplateConfigRow): ProjectTemplateConfig {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    templateKey: row.template_key,
+    templateName: row.template_name,
+    musicKey: row.music_key ?? DEFAULT_MUSIC_TRACK_KEY,
+    defaultTransitionKey: row.default_transition_key,
+    defaultThemeKey: row.default_theme_key,
+    defaultFrameStyleKey: row.default_frame_style_key,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -305,11 +339,13 @@ export async function getProjectDetails(
 
   const mappedAssets = await listAssetsForProject(projectId);
   const canvaExport = await getProjectCanvaExport(projectId);
+  const templateConfig = await getProjectTemplateConfig(projectId);
 
   return {
     ...buildSummary(project as ProjectRow, mappedAssets),
     assets: mappedAssets,
     canvaExport,
+    templateConfig,
   };
 }
 
@@ -764,6 +800,111 @@ export async function saveTimeline(
   }
 
   await touchProject(projectId, "ready");
+}
+
+function resolveTemplatePreset(templateKey: StudioTemplateKey) {
+  const preset = STUDIO_TEMPLATE_PRESETS.find((item) => item.key === templateKey);
+
+  if (!preset) {
+    throw new Error("找不到指定模板。");
+  }
+
+  return preset;
+}
+
+function resolveMusicTrack(musicKey: MusicTrackKey) {
+  const track = MUSIC_TRACK_OPTIONS.find((item) => item.key === musicKey);
+
+  if (!track) {
+    throw new Error("找不到指定音樂。");
+  }
+
+  return track;
+}
+
+export async function getProjectTemplateConfig(projectId: string) {
+  const client = assertSupabaseAdmin();
+  const { data, error } = await client
+    .from("project_template_configs")
+    .select("*")
+    .eq("project_id", projectId)
+    .maybeSingle();
+
+  if (error) {
+    if (
+      error.message.includes("project_template_configs") ||
+      error.message.includes("music_key")
+    ) {
+      return null;
+    }
+
+    throw new Error(error.message);
+  }
+
+  return data ? mapTemplateConfig(data as ProjectTemplateConfigRow) : null;
+}
+
+export async function saveProjectTemplateConfig(input: {
+  projectId: string;
+  templateKey: StudioTemplateKey;
+  musicKey?: MusicTrackKey;
+  applyToAllAssets: boolean;
+}) {
+  const preset = resolveTemplatePreset(input.templateKey);
+  const musicTrack = resolveMusicTrack(
+    (input.musicKey ?? DEFAULT_MUSIC_TRACK_KEY) as MusicTrackKey,
+  );
+  const client = assertSupabaseAdmin();
+
+  const { data, error } = await client
+    .from("project_template_configs")
+    .upsert(
+      {
+        project_id: input.projectId,
+        template_key: preset.key,
+        template_name: preset.label,
+        music_key: musicTrack.key,
+        default_transition_key: preset.transitionKey,
+        default_theme_key: preset.themeKey,
+        default_frame_style_key: preset.frameStyleKey,
+      },
+      { onConflict: "project_id" },
+    )
+    .select("*")
+    .single();
+
+  if (error) {
+    if (
+      error.message.includes("project_template_configs") ||
+      error.message.includes("music_key")
+    ) {
+      throw new Error("尚未建立模板設定資料表。請先執行最新 supabase/schema.sql。");
+    }
+
+    throw new Error(error.message);
+  }
+
+  if (input.applyToAllAssets) {
+    const { error: updateError } = await client
+      .from("project_assets")
+      .update({
+        transition_key: preset.transitionKey,
+        theme_key: preset.themeKey,
+        frame_style_key: preset.frameStyleKey,
+      })
+      .eq("project_id", input.projectId);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
+    await touchProject(input.projectId, "ready");
+  }
+
+  return {
+    templateConfig: mapTemplateConfig(data as ProjectTemplateConfigRow),
+    assets: input.applyToAllAssets ? await listAssetsForProject(input.projectId) : null,
+  };
 }
 
 export async function getProjectCanvaExport(projectId: string) {

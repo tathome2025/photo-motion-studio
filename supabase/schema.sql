@@ -54,6 +54,19 @@ create table if not exists public.project_canva_exports (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.project_template_configs (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null unique references public.projects(id) on delete cascade,
+  template_key text not null check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic')),
+  template_name text not null,
+  music_key text not null check (music_key in ('track-01', 'track-02', 'track-03', 'track-04', 'track-05', 'track-06', 'track-07', 'track-08', 'track-09', 'track-10')),
+  default_transition_key text not null check (default_transition_key in ('cut', 'fade', 'wipeleft', 'slideup')),
+  default_theme_key text not null check (default_theme_key in ('editorial', 'mono', 'warm', 'blueprint')),
+  default_frame_style_key text not null check (default_frame_style_key in ('none', 'single', 'double', 'offset')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists idx_project_assets_project_id on public.project_assets(project_id);
 create index if not exists idx_project_assets_status on public.project_assets(project_id, generation_status);
 
@@ -66,6 +79,27 @@ alter table public.project_canva_exports
   add column if not exists template_url text not null default '';
 
 alter table public.project_canva_exports drop constraint if exists project_canva_exports_template_key_check;
+
+alter table public.project_template_configs
+  add column if not exists template_name text not null default 'Clean Cut',
+  add column if not exists music_key text not null default 'track-01',
+  add column if not exists default_transition_key text not null default 'cut',
+  add column if not exists default_theme_key text not null default 'editorial',
+  add column if not exists default_frame_style_key text not null default 'none';
+
+alter table public.project_template_configs
+  drop constraint if exists project_template_configs_template_key_check;
+
+alter table public.project_template_configs
+  add constraint project_template_configs_template_key_check
+  check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic'));
+
+alter table public.project_template_configs
+  drop constraint if exists project_template_configs_music_key_check;
+
+alter table public.project_template_configs
+  add constraint project_template_configs_music_key_check
+  check (music_key in ('track-01', 'track-02', 'track-03', 'track-04', 'track-05', 'track-06', 'track-07', 'track-08', 'track-09', 'track-10'));
 
 alter table public.project_assets drop constraint if exists project_assets_prompt_key_check;
 
@@ -125,10 +159,17 @@ before update on public.project_canva_exports
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists project_template_configs_set_updated_at on public.project_template_configs;
+create trigger project_template_configs_set_updated_at
+before update on public.project_template_configs
+for each row
+execute function public.set_updated_at();
+
 alter table public.projects disable row level security;
 alter table public.project_assets disable row level security;
 alter table public.render_jobs disable row level security;
 alter table public.project_canva_exports disable row level security;
+alter table public.project_template_configs disable row level security;
 
 insert into storage.buckets (id, name, public)
 values

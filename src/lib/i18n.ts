@@ -1,12 +1,16 @@
 import {
   FRAME_STYLE_OPTIONS,
+  MUSIC_TRACK_OPTIONS,
   PROMPT_OPTIONS,
+  STUDIO_TEMPLATE_PRESETS,
   THEME_OPTIONS,
   TRANSITION_OPTIONS,
 } from "@/lib/constants";
 import type {
   FrameStyleKey,
+  MusicTrackKey,
   PromptKey,
+  StudioTemplateKey,
   ThemeKey,
   TransitionKey,
 } from "@/lib/types";
@@ -92,6 +96,68 @@ export function getFrameStyleOptions(locale: Locale) {
   return FRAME_STYLE_OPTIONS.map((option) => ({
     ...option,
     label: labels[option.key][locale],
+  }));
+}
+
+export function getStudioTemplateOptions(locale: Locale) {
+  const labels: Record<
+    StudioTemplateKey,
+    { label: Record<Locale, string>; description: Record<Locale, string> }
+  > = {
+    "clean-cut": {
+      label: { zh: "清晰直剪", en: "Clean Cut" },
+      description: {
+        zh: "最簡約的線條風格，直接切換畫面。",
+        en: "Minimal line styling with direct cuts.",
+      },
+    },
+    magazine: {
+      label: { zh: "雜誌版面", en: "Magazine Grid" },
+      description: {
+        zh: "編輯感版面，使用淡入淡出與單層邊框。",
+        en: "Editorial layout with fades and single frames.",
+      },
+    },
+    spotlight: {
+      label: { zh: "焦點舞台", en: "Spotlight" },
+      description: {
+        zh: "暖色重點風格，轉場節奏更明顯。",
+        en: "Warm spotlight style with stronger transitions.",
+      },
+    },
+    cinematic: {
+      label: { zh: "電影感動態", en: "Cinematic Motion" },
+      description: {
+        zh: "藍圖色調配上更有戲劇感的滑入轉場。",
+        en: "Blueprint tone with dramatic slide transitions.",
+      },
+    },
+  };
+
+  return STUDIO_TEMPLATE_PRESETS.map((template) => ({
+    ...template,
+    label: labels[template.key].label[locale],
+    description: labels[template.key].description[locale],
+  }));
+}
+
+export function getMusicTrackOptions(locale: Locale) {
+  const labels: Record<MusicTrackKey, Record<Locale, string>> = {
+    "track-01": { zh: "音樂 01", en: "Track 01" },
+    "track-02": { zh: "音樂 02", en: "Track 02" },
+    "track-03": { zh: "音樂 03", en: "Track 03" },
+    "track-04": { zh: "音樂 04", en: "Track 04" },
+    "track-05": { zh: "音樂 05", en: "Track 05" },
+    "track-06": { zh: "音樂 06", en: "Track 06" },
+    "track-07": { zh: "音樂 07", en: "Track 07" },
+    "track-08": { zh: "音樂 08", en: "Track 08" },
+    "track-09": { zh: "音樂 09", en: "Track 09" },
+    "track-10": { zh: "音樂 10", en: "Track 10" },
+  };
+
+  return MUSIC_TRACK_OPTIONS.map((track) => ({
+    ...track,
+    label: labels[track.key][locale],
   }));
 }
 

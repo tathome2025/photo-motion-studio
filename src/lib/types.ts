@@ -34,6 +34,19 @@ export type ThemeKey = "editorial" | "mono" | "warm" | "blueprint";
 
 export type FrameStyleKey = "none" | "single" | "double" | "offset";
 
+export type StudioTemplateKey = "clean-cut" | "magazine" | "spotlight" | "cinematic";
+export type MusicTrackKey =
+  | "track-01"
+  | "track-02"
+  | "track-03"
+  | "track-04"
+  | "track-05"
+  | "track-06"
+  | "track-07"
+  | "track-08"
+  | "track-09"
+  | "track-10";
+
 export interface PromptOption {
   key: PromptKey;
   label: string;
@@ -56,6 +69,21 @@ export interface ThemeOption {
 export interface FrameStyleOption {
   key: FrameStyleKey;
   label: string;
+}
+
+export interface StudioTemplatePreset {
+  key: StudioTemplateKey;
+  label: string;
+  description: string;
+  transitionKey: TransitionKey;
+  themeKey: ThemeKey;
+  frameStyleKey: FrameStyleKey;
+}
+
+export interface MusicTrackOption {
+  key: MusicTrackKey;
+  label: string;
+  filePath: string;
 }
 
 export interface ProjectSummary {
@@ -94,6 +122,7 @@ export interface ProjectAsset {
 export interface ProjectDetails extends ProjectSummary {
   assets: ProjectAsset[];
   canvaExport: ProjectCanvaExport | null;
+  templateConfig: ProjectTemplateConfig | null;
 }
 
 export interface ProjectCanvaExport {
@@ -116,4 +145,17 @@ export interface TimelineUpdateItem {
   transitionKey: TransitionKey;
   themeKey: ThemeKey;
   frameStyleKey: FrameStyleKey;
+}
+
+export interface ProjectTemplateConfig {
+  id: string;
+  projectId: string;
+  templateKey: StudioTemplateKey;
+  templateName: string;
+  musicKey: MusicTrackKey;
+  defaultTransitionKey: TransitionKey;
+  defaultThemeKey: ThemeKey;
+  defaultFrameStyleKey: FrameStyleKey;
+  createdAt: string;
+  updatedAt: string;
 }
