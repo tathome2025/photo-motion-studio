@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { TemplateMusicSelector } from "@/components/template-music-selector";
-import { getProjectDetails } from "@/lib/data";
+import { getProjectDetails, listStudioTemplatePresets } from "@/lib/data";
 import { getServerLocale } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +15,7 @@ interface StylePageProps {
 export default async function StylePage({ params }: StylePageProps) {
   const { projectId } = await params;
   const locale = await getServerLocale();
+  const templates = await listStudioTemplatePresets();
   const project = await getProjectDetails(projectId);
 
   if (!project) {
@@ -34,6 +35,7 @@ export default async function StylePage({ params }: StylePageProps) {
       <TemplateMusicSelector
         projectId={projectId}
         assetCount={project.completedCount}
+        templateOptions={templates}
         initialTemplateConfig={project.templateConfig}
         locale={locale}
       />

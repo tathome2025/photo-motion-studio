@@ -4,7 +4,7 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile } from "@ffmpeg/util";
 
 import { THEME_OPTIONS } from "@/lib/constants";
-import type { ProjectAsset, StudioTemplatePreset } from "@/lib/types";
+import type { FrameStyleKey, ProjectAsset, ThemeKey, TransitionKey } from "@/lib/types";
 
 let ffmpegInstance: FFmpeg | null = null;
 
@@ -105,15 +105,19 @@ async function ensureFfmpegLoaded() {
 
 export async function renderVideoPreview(input: {
   assets: ProjectAsset[];
-  templatePreset: StudioTemplatePreset;
+  settings: {
+    transitionKey: TransitionKey;
+    themeKey: ThemeKey;
+    frameStyleKey: FrameStyleKey;
+  };
   musicFilePath?: string | null;
 }) {
   const ffmpeg = await ensureFfmpegLoaded();
   const presetAssets = input.assets.map((asset) => ({
     ...asset,
-    transitionKey: input.templatePreset.transitionKey,
-    themeKey: input.templatePreset.themeKey,
-    frameStyleKey: input.templatePreset.frameStyleKey,
+    transitionKey: input.settings.transitionKey,
+    themeKey: input.settings.themeKey,
+    frameStyleKey: input.settings.frameStyleKey,
   }));
 
   const args: string[] = ["-y"];

@@ -5,12 +5,18 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { DEFAULT_MUSIC_TRACK_KEY } from "@/lib/constants";
-import { getMusicTrackOptions, getStudioTemplateOptions, type Locale } from "@/lib/i18n";
-import type { MusicTrackKey, ProjectTemplateConfig, StudioTemplateKey } from "@/lib/types";
+import { getMusicTrackOptions, type Locale } from "@/lib/i18n";
+import type {
+  MusicTrackKey,
+  ProjectTemplateConfig,
+  StudioTemplateKey,
+  StudioTemplatePreset,
+} from "@/lib/types";
 
 interface TemplateMusicSelectorProps {
   projectId: string;
   assetCount: number;
+  templateOptions: StudioTemplatePreset[];
   initialTemplateConfig: ProjectTemplateConfig | null;
   locale: Locale;
 }
@@ -30,11 +36,11 @@ async function parseApiResponse(response: Response) {
 export function TemplateMusicSelector({
   projectId,
   assetCount,
+  templateOptions,
   initialTemplateConfig,
   locale,
 }: TemplateMusicSelectorProps) {
   const router = useRouter();
-  const templateOptions = getStudioTemplateOptions(locale);
   const musicOptions = getMusicTrackOptions(locale);
   const [selectedTemplate, setSelectedTemplate] = useState<StudioTemplateKey>(
     initialTemplateConfig?.templateKey ?? templateOptions[0].key,

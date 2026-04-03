@@ -20,6 +20,7 @@ import type {
   ProjectTemplateConfig,
   MusicTrackKey,
   PromptKey,
+  StudioTemplatePreset,
   StudioTemplateKey,
   TimelineUpdateItem,
   CanvaExportStatus,
@@ -83,6 +84,16 @@ type ProjectTemplateConfigRow = {
   updated_at: string;
 };
 
+type TemplatePresetRow = {
+  template_key: StudioTemplateKey;
+  label: string;
+  description: string;
+  transition_key: ProjectAsset["transitionKey"];
+  theme_key: ProjectAsset["themeKey"];
+  frame_style_key: ProjectAsset["frameStyleKey"];
+  sort_order: number | null;
+};
+
 function mapAsset(row: AssetRow): ProjectAsset {
   return {
     id: row.id,
@@ -138,6 +149,17 @@ function mapTemplateConfig(row: ProjectTemplateConfigRow): ProjectTemplateConfig
     defaultFrameStyleKey: row.default_frame_style_key,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapTemplatePreset(row: TemplatePresetRow): StudioTemplatePreset {
+  return {
+    key: row.template_key,
+    label: row.label,
+    description: row.description,
+    transitionKey: row.transition_key,
+    themeKey: row.theme_key,
+    frameStyleKey: row.frame_style_key,
   };
 }
 
@@ -802,16 +824,6 @@ export async function saveTimeline(
   await touchProject(projectId, "ready");
 }
 
-function resolveTemplatePreset(templateKey: StudioTemplateKey) {
-  const preset = STUDIO_TEMPLATE_PRESETS.find((item) => item.key === templateKey);
-
-  if (!preset) {
-    throw new Error("找不到指定模板。");
-  }
-
-  return preset;
-}
-
 function resolveMusicTrack(musicKey: MusicTrackKey) {
   const track = MUSIC_TRACK_OPTIONS.find((item) => item.key === musicKey);
 
@@ -820,6 +832,79 @@ function resolveMusicTrack(musicKey: MusicTrackKey) {
   }
 
   return track;
+}
+
+export async function listStudioTemplatePresets() {
+  const client = getSupabaseAdmin();
+
+  if (!client) {
+    return STUDIO_TEMPLATE_PRESETS;
+  }
+
+  const { data, error } = await client
+    .from("template_presets")
+    .select("*")
+    .order("sort_order", { ascending: true })
+    .order("template_key", { ascending: true });
+
+  if (error) {
+    if (error.message.includes("template_presets")) {
+      return STUDIO_TEMPLATE_PRESETS;
+    }
+
+    throw new Error(error.message);
+  }
+
+  const presets = ((data ?? []) as TemplatePresetRow[]).map(mapTemplatePreset);
+  return presets.length > 0 ? presets : STUDIO_TEMPLATE_PRESETS;
+}
+
+export async function updateStudioTemplatePreset(input: {
+  templateKey: StudioTemplateKey;
+  label: string;
+  description: string;
+  transitionKey: ProjectAsset["transitionKey"];
+  themeKey: ProjectAsset["themeKey"];
+  frameStyleKey: ProjectAsset["frameStyleKey"];
+}) {
+  const client = assertSupabaseAdmin();
+  const { data, error } = await client
+    .from("template_presets")
+    .update({
+      label: input.label.trim(),
+      description: input.description.trim(),
+      transition_key: input.transitionKey,
+      theme_key: input.themeKey,
+      frame_style_key: input.frameStyleKey,
+    })
+    .eq("template_key", input.templateKey)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    if (error.message.includes("template_presets")) {
+      throw new Error("尚未建立模板預設資料表。請先執行最新 supabase/schema.sql。");
+    }
+
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("找不到要更新的模板。");
+  }
+
+  return mapTemplatePreset(data as TemplatePresetRow);
+}
+
+async function getStudioTemplatePresetByKey(templateKey: StudioTemplateKey) {
+  const presets = await listStudioTemplatePresets();
+  const preset = presets.find((item) => item.key === templateKey);
+
+  if (!preset) {
+    throw new Error("找不到指定模板。");
+  }
+
+  return preset;
 }
 
 export async function getProjectTemplateConfig(projectId: string) {
@@ -850,7 +935,7 @@ export async function saveProjectTemplateConfig(input: {
   musicKey?: MusicTrackKey;
   applyToAllAssets: boolean;
 }) {
-  const preset = resolveTemplatePreset(input.templateKey);
+  const preset = await getStudioTemplatePresetByKey(input.templateKey);
   const musicTrack = resolveMusicTrack(
     (input.musicKey ?? DEFAULT_MUSIC_TRACK_KEY) as MusicTrackKey,
   );

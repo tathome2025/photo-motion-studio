@@ -67,6 +67,18 @@ create table if not exists public.project_template_configs (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.template_presets (
+  template_key text primary key check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic')),
+  label text not null,
+  description text not null,
+  transition_key text not null check (transition_key in ('cut', 'fade', 'wipeleft', 'slideup')),
+  theme_key text not null check (theme_key in ('editorial', 'mono', 'warm', 'blueprint')),
+  frame_style_key text not null check (frame_style_key in ('none', 'single', 'double', 'offset')),
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists idx_project_assets_project_id on public.project_assets(project_id);
 create index if not exists idx_project_assets_status on public.project_assets(project_id, generation_status);
 
@@ -100,6 +112,42 @@ alter table public.project_template_configs
 alter table public.project_template_configs
   add constraint project_template_configs_music_key_check
   check (music_key in ('track-01', 'track-02', 'track-03', 'track-04', 'track-05', 'track-06', 'track-07', 'track-08', 'track-09', 'track-10'));
+
+alter table public.template_presets
+  add column if not exists label text not null default 'Clean Cut',
+  add column if not exists description text not null default 'Minimal line styling for direct storytelling.',
+  add column if not exists transition_key text not null default 'cut',
+  add column if not exists theme_key text not null default 'editorial',
+  add column if not exists frame_style_key text not null default 'none',
+  add column if not exists sort_order integer not null default 0;
+
+alter table public.template_presets
+  drop constraint if exists template_presets_template_key_check;
+
+alter table public.template_presets
+  add constraint template_presets_template_key_check
+  check (template_key in ('clean-cut', 'magazine', 'spotlight', 'cinematic'));
+
+alter table public.template_presets
+  drop constraint if exists template_presets_transition_key_check;
+
+alter table public.template_presets
+  add constraint template_presets_transition_key_check
+  check (transition_key in ('cut', 'fade', 'wipeleft', 'slideup'));
+
+alter table public.template_presets
+  drop constraint if exists template_presets_theme_key_check;
+
+alter table public.template_presets
+  add constraint template_presets_theme_key_check
+  check (theme_key in ('editorial', 'mono', 'warm', 'blueprint'));
+
+alter table public.template_presets
+  drop constraint if exists template_presets_frame_style_key_check;
+
+alter table public.template_presets
+  add constraint template_presets_frame_style_key_check
+  check (frame_style_key in ('none', 'single', 'double', 'offset'));
 
 alter table public.project_assets drop constraint if exists project_assets_prompt_key_check;
 
@@ -165,11 +213,18 @@ before update on public.project_template_configs
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists template_presets_set_updated_at on public.template_presets;
+create trigger template_presets_set_updated_at
+before update on public.template_presets
+for each row
+execute function public.set_updated_at();
+
 alter table public.projects disable row level security;
 alter table public.project_assets disable row level security;
 alter table public.render_jobs disable row level security;
 alter table public.project_canva_exports disable row level security;
 alter table public.project_template_configs disable row level security;
+alter table public.template_presets disable row level security;
 
 insert into storage.buckets (id, name, public)
 values
@@ -177,3 +232,19 @@ values
   ('project-generated', 'project-generated', true),
   ('project-renders', 'project-renders', true)
 on conflict (id) do nothing;
+
+insert into public.template_presets (
+  template_key,
+  label,
+  description,
+  transition_key,
+  theme_key,
+  frame_style_key,
+  sort_order
+)
+values
+  ('clean-cut', 'Clean Cut', 'Minimal line styling for direct storytelling.', 'cut', 'editorial', 'none', 1),
+  ('magazine', 'Magazine Grid', 'Editorial look with gentle fades and slim frames.', 'fade', 'mono', 'single', 2),
+  ('spotlight', 'Spotlight', 'Warmer framing with stronger motion transitions.', 'wipeleft', 'warm', 'double', 3),
+  ('cinematic', 'Cinematic Motion', 'Blueprint tones with dramatic slide transitions.', 'slideup', 'blueprint', 'offset', 4)
+on conflict (template_key) do nothing;

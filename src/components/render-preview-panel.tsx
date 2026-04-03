@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { MUSIC_TRACK_OPTIONS, STUDIO_TEMPLATE_PRESETS } from "@/lib/constants";
+import { MUSIC_TRACK_OPTIONS } from "@/lib/constants";
 import { renderVideoPreview } from "@/lib/client-render";
 import type { Locale } from "@/lib/i18n";
 import type { ProjectAsset, ProjectTemplateConfig } from "@/lib/types";
@@ -26,9 +26,6 @@ export function RenderPreviewPanel({
   const [isRendering, setIsRendering] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const templatePreset = STUDIO_TEMPLATE_PRESETS.find(
-    (preset) => preset.key === templateConfig.templateKey,
-  );
   const musicTrack = MUSIC_TRACK_OPTIONS.find((track) => track.key === templateConfig.musicKey);
   const playableAssets = useMemo(
     () => assets.filter((asset) => asset.generationStatus === "completed"),
@@ -74,25 +71,24 @@ export function RenderPreviewPanel({
   }, [previewUrl]);
 
   useEffect(() => {
-    if (playableAssets.length === 0 || !templatePreset) {
+    if (playableAssets.length === 0) {
       return;
     }
 
     let cancelled = false;
 
     async function run() {
-      const activeTemplate = templatePreset;
-      if (!activeTemplate) {
-        return;
-      }
-
       setError(null);
       setIsRendering(true);
 
       try {
         const blob = await renderVideoPreview({
           assets: playableAssets,
-          templatePreset: activeTemplate,
+          settings: {
+            transitionKey: templateConfig.defaultTransitionKey,
+            themeKey: templateConfig.defaultThemeKey,
+            frameStyleKey: templateConfig.defaultFrameStyleKey,
+          },
           musicFilePath: musicTrack?.filePath ?? null,
         });
 
@@ -123,7 +119,14 @@ export function RenderPreviewPanel({
     return () => {
       cancelled = true;
     };
-  }, [copy.failed, musicTrack?.filePath, playableAssets, templatePreset]);
+  }, [
+    copy.failed,
+    musicTrack?.filePath,
+    playableAssets,
+    templateConfig.defaultFrameStyleKey,
+    templateConfig.defaultThemeKey,
+    templateConfig.defaultTransitionKey,
+  ]);
 
   function downloadVideo() {
     if (!previewUrl) {
@@ -137,8 +140,7 @@ export function RenderPreviewPanel({
   }
 
   async function rerender() {
-    const activeTemplate = templatePreset;
-    if (!activeTemplate || playableAssets.length === 0) {
+    if (playableAssets.length === 0) {
       return;
     }
 
@@ -148,7 +150,11 @@ export function RenderPreviewPanel({
     try {
       const blob = await renderVideoPreview({
         assets: playableAssets,
-        templatePreset: activeTemplate,
+        settings: {
+          transitionKey: templateConfig.defaultTransitionKey,
+          themeKey: templateConfig.defaultThemeKey,
+          frameStyleKey: templateConfig.defaultFrameStyleKey,
+        },
         musicFilePath: musicTrack?.filePath ?? null,
       });
 
