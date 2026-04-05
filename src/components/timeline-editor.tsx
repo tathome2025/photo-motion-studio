@@ -30,6 +30,8 @@ interface TimelineEditorProps {
   locale: Locale;
 }
 
+type GeneratedMotionAsset = ProjectAsset & { generatedUrl: string; isStaticClip: false };
+
 function SortableTimelineClip({
   asset,
   isSelected,
@@ -143,6 +145,11 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
             "Regeneration opens a separate page that shows all thumbnails at once, so you can select clips and assign actions one by one.",
           openRegenerate: "Open regenerate page",
           deletePhoto: "Delete photo",
+          downloadClip: "Download clip",
+          downloadSectionTitle: "Generated motion clips",
+          downloadAllClips: "Download all clips",
+          downloadStarted: "Download started.",
+          noGeneratedClips: "No generated motion clips yet.",
           horizontalTimeline: "Horizontal timeline",
           reorder: "Drag thumbnails to reorder",
           clips: (count: number) => `${count} clips`,
@@ -169,6 +176,11 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
             "重新生成會打開獨立頁面，一次過顯示所有縮圖，再逐張勾選並設定生成動作。",
           openRegenerate: "打開重新生成頁面",
           deletePhoto: "刪除相片",
+          downloadClip: "下載片段",
+          downloadSectionTitle: "已生成動態影像",
+          downloadAllClips: "下載全部片段",
+          downloadStarted: "已開始下載。",
+          noGeneratedClips: "目前沒有已生成動態影像。",
           horizontalTimeline: "Horizontal timeline",
           reorder: "拖動縮圖重新排序",
           clips: (count: number) => `${count} clips`,
@@ -188,6 +200,54 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
   const selectedAsset =
     assets.find((asset) => asset.id === selectedAssetId) ?? assets[0] ?? null;
   const orderedIds = useMemo(() => assets.map((asset) => asset.id), [assets]);
+  const generatedMotionAssets = useMemo(
+    () =>
+      assets.filter(
+        (asset): asset is GeneratedMotionAsset =>
+          asset.generationStatus === "completed" && !asset.isStaticClip && Boolean(asset.generatedUrl),
+      ),
+    [assets],
+  );
+
+  function triggerDownload(url: string, fileName: string) {
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.rel = "noopener";
+    anchor.click();
+  }
+
+  function buildDownloadFileName(asset: ProjectAsset) {
+    const normalizedName = asset.fileName.replace(/\.[^/.]+$/, "");
+    return `${normalizedName}-motion.mp4`;
+  }
+
+  function downloadSelectedClip() {
+    if (!selectedAsset?.generatedUrl || selectedAsset.isStaticClip) {
+      return;
+    }
+
+    triggerDownload(selectedAsset.generatedUrl, buildDownloadFileName(selectedAsset));
+    setStatusMessage(copy.downloadStarted);
+  }
+
+  function downloadAllGeneratedClips() {
+    if (generatedMotionAssets.length === 0) {
+      return;
+    }
+
+    generatedMotionAssets.forEach((asset, index) => {
+      if (!asset.generatedUrl) {
+        return;
+      }
+
+      window.setTimeout(() => {
+        triggerDownload(asset.generatedUrl, buildDownloadFileName(asset));
+      }, index * 220);
+    });
+
+    setStatusMessage(copy.downloadStarted);
+  }
 
   function persistTimeline(nextAssets: ProjectAsset[], successMessage = copy.saved) {
     setError(null);
@@ -374,7 +434,53 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
             <Trash2 size={15} />
             {copy.deletePhoto}
           </button>
+
+          {!selectedAsset.isStaticClip && selectedAsset.generatedUrl ? (
+            <button
+              type="button"
+              className="inline-flex h-11 items-center justify-center border border-[var(--line)] px-4 text-sm uppercase tracking-[0.2em] transition hover:border-[var(--text)]"
+              onClick={downloadSelectedClip}
+            >
+              {copy.downloadClip}
+            </button>
+          ) : null}
         </div>
+      </section>
+
+      <section className="grid gap-4 border border-[var(--line)] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">Download</p>
+            <h3 className="text-2xl tracking-tight">{copy.downloadSectionTitle}</h3>
+          </div>
+          <button
+            type="button"
+            className="h-11 border border-[var(--line)] px-4 text-sm uppercase tracking-[0.2em] transition hover:border-[var(--text)] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
+            onClick={downloadAllGeneratedClips}
+            disabled={generatedMotionAssets.length === 0}
+          >
+            {copy.downloadAllClips}
+          </button>
+        </div>
+
+        {generatedMotionAssets.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">{copy.noGeneratedClips}</p>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {generatedMotionAssets.map((asset) => (
+              <article key={asset.id} className="grid gap-2 border border-[var(--line)] p-3">
+                <p className="truncate text-sm text-[var(--muted)]">{asset.fileName}</p>
+                <button
+                  type="button"
+                  className="h-10 border border-[var(--line)] px-4 text-xs uppercase tracking-[0.18em] transition hover:border-[var(--text)]"
+                  onClick={() => triggerDownload(asset.generatedUrl, buildDownloadFileName(asset))}
+                >
+                  {copy.downloadClip}
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="grid gap-4 border border-[var(--line)] p-5">
