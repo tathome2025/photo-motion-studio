@@ -123,6 +123,8 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
   const [error, setError] = useState<string | null>(null);
   const [isMergingDownload, setIsMergingDownload] = useState(false);
   const [mergeProgress, setMergeProgress] = useState(0);
+  const [mergedVideoUrl, setMergedVideoUrl] = useState<string | null>(null);
+  const [mergedFileName, setMergedFileName] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const copy =
     locale === "en"
@@ -154,6 +156,8 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           downloadStarted: "Download started.",
           downloadMergedWorking: "Merging timeline video...",
           downloadMergedProgress: (value: number) => `Merging... ${value}%`,
+          downloadMergedReady: "Merged video is ready.",
+          downloadMergedNow: "Download merged video now",
           downloadMergedFailed: "Failed to merge timeline video.",
           noGeneratedClips: "No generated motion clips yet.",
           horizontalTimeline: "Horizontal timeline",
@@ -188,6 +192,8 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           downloadStarted: "已開始下載。",
           downloadMergedWorking: "正在合成排序影片...",
           downloadMergedProgress: (value: number) => `合成中... ${value}%`,
+          downloadMergedReady: "合成影片已完成。",
+          downloadMergedNow: "立即下載合成影片",
           downloadMergedFailed: "合成排序影片失敗。",
           noGeneratedClips: "目前沒有已生成動態影像。",
           horizontalTimeline: "Horizontal timeline",
@@ -231,6 +237,14 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
     return `${normalizedName}-motion.mp4`;
   }
 
+  useEffect(() => {
+    return () => {
+      if (mergedVideoUrl) {
+        URL.revokeObjectURL(mergedVideoUrl);
+      }
+    };
+  }, [mergedVideoUrl]);
+
   function downloadSelectedClip() {
     if (!selectedAsset?.generatedUrl || selectedAsset.isStaticClip) {
       return;
@@ -249,6 +263,14 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
     setStatusMessage(copy.downloadMergedWorking);
     setIsMergingDownload(true);
     setMergeProgress(0);
+    setMergedVideoUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+
+      return null;
+    });
+    setMergedFileName(null);
 
     try {
       const mergedBlob = await mergeTimelineMotionClips({
@@ -259,15 +281,24 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
       });
       const mergedUrl = URL.createObjectURL(mergedBlob);
       const projectSlug = projectId.slice(0, 8);
-      triggerDownload(mergedUrl, `timeline-${projectSlug}.mp4`);
-      window.setTimeout(() => URL.revokeObjectURL(mergedUrl), 5000);
-      setStatusMessage(copy.downloadStarted);
+      setMergedVideoUrl(mergedUrl);
+      setMergedFileName(`timeline-${projectSlug}.mp4`);
+      setStatusMessage(copy.downloadMergedReady);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : copy.downloadMergedFailed);
     } finally {
       setIsMergingDownload(false);
       setMergeProgress(0);
     }
+  }
+
+  function downloadMergedResult() {
+    if (!mergedVideoUrl || !mergedFileName) {
+      return;
+    }
+
+    triggerDownload(mergedVideoUrl, mergedFileName);
+    setStatusMessage(copy.downloadStarted);
   }
 
   function persistTimeline(nextAssets: ProjectAsset[], successMessage = copy.saved) {
@@ -499,6 +530,18 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
                     style={{ width: `${mergeProgress}%` }}
                   />
                 </div>
+              </div>
+            ) : null}
+            {mergedVideoUrl ? (
+              <div className="grid gap-2 border border-[var(--line)] bg-[var(--surface-soft)] p-3">
+                <p className="text-sm text-[var(--muted)]">{copy.downloadMergedReady}</p>
+                <button
+                  type="button"
+                  className="h-10 border border-[var(--line)] px-4 text-xs uppercase tracking-[0.18em] transition hover:border-[var(--text)]"
+                  onClick={downloadMergedResult}
+                >
+                  {copy.downloadMergedNow}
+                </button>
               </div>
             ) : null}
 
