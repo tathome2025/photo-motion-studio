@@ -18,6 +18,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { flushSync } from "react-dom";
 import { GripVertical, Trash2 } from "lucide-react";
 
 import { MAX_REGENERATION_COUNT } from "@/lib/constants";
@@ -259,18 +260,24 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
       return;
     }
 
-    setError(null);
-    setStatusMessage(copy.downloadMergedWorking);
-    setIsMergingDownload(true);
-    setMergeProgress(0);
-    setMergedVideoUrl((current) => {
-      if (current) {
-        URL.revokeObjectURL(current);
-      }
+    flushSync(() => {
+      setError(null);
+      setStatusMessage(copy.downloadMergedWorking);
+      setIsMergingDownload(true);
+      setMergeProgress(1);
+      setMergedVideoUrl((current) => {
+        if (current) {
+          URL.revokeObjectURL(current);
+        }
 
-      return null;
+        return null;
+      });
+      setMergedFileName(null);
     });
-    setMergedFileName(null);
+
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
 
     try {
       const mergedBlob = await mergeTimelineMotionClips({
@@ -519,6 +526,11 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           <p className="text-sm text-[var(--muted)]">{copy.noGeneratedClips}</p>
         ) : (
           <>
+            {error ? (
+              <div className="border border-[#8d2f24] bg-[#fff3f1] p-3 text-sm text-[#8d2f24]">
+                {error}
+              </div>
+            ) : null}
             {isMergingDownload ? (
               <div className="grid gap-2 border border-[var(--line)] bg-[var(--surface-soft)] p-3">
                 <p className="text-sm text-[var(--muted)]">
@@ -598,7 +610,6 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
       </section>
 
       {statusMessage ? <p className="text-sm text-[#2e5a31]">{statusMessage}</p> : null}
-      {error ? <p className="text-sm text-[#8d2f24]">{error}</p> : null}
     </div>
   );
 }
