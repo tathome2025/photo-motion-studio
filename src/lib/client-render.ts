@@ -126,8 +126,17 @@ export async function renderVideoPreview(input: {
 
 export async function mergeTimelineMotionClips(input: {
   assets: ProjectAsset[];
+  onProgress?: (progress: number) => void;
 }) {
   const ffmpeg = await ensureFfmpegLoaded();
+  const reportProgress = (value: number) => {
+    if (!input.onProgress) {
+      return;
+    }
+
+    const normalized = Math.max(0, Math.min(1, value));
+    input.onProgress(normalized);
+  };
   const playableAssets = input.assets.filter(
     (asset) =>
       asset.generationStatus === "completed" &&
@@ -139,12 +148,14 @@ export async function mergeTimelineMotionClips(input: {
     throw new Error("沒有可合成的動態片段。");
   }
 
+  reportProgress(0.02);
   const args: string[] = ["-y"];
 
   for (let index = 0; index < playableAssets.length; index += 1) {
     const asset = playableAssets[index];
     await ffmpeg.writeFile(`merge-clip-${index}.mp4`, await fetchFile(asset.generatedUrl as string));
     args.push("-i", `merge-clip-${index}.mp4`);
+    reportProgress(((index + 1) / playableAssets.length) * 0.35);
   }
 
   const preparedFilters = playableAssets.map(
@@ -157,25 +168,37 @@ export async function mergeTimelineMotionClips(input: {
     `${concatInputs}concat=n=${playableAssets.length}:v=1:a=0[mergedv]`,
   ].join(";");
 
-  await ffmpeg.exec([
-    ...args,
-    "-filter_complex",
-    filterComplex,
-    "-map",
-    "[mergedv]",
-    "-c:v",
-    "libx264",
-    "-pix_fmt",
-    "yuv420p",
-    "-movflags",
-    "+faststart",
-    "timeline-merged.mp4",
-  ]);
+  const handleProgress = ({ progress }: { progress: number }) => {
+    reportProgress(0.35 + Math.max(0, Math.min(1, progress)) * 0.6);
+  };
+  ffmpeg.on("progress", handleProgress);
+
+  try {
+    await ffmpeg.exec([
+      ...args,
+      "-filter_complex",
+      filterComplex,
+      "-map",
+      "[mergedv]",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-movflags",
+      "+faststart",
+      "timeline-merged.mp4",
+    ]);
+  } finally {
+    ffmpeg.off("progress", handleProgress);
+  }
+
+  reportProgress(0.97);
 
   const output = await ffmpeg.readFile("timeline-merged.mp4");
   const bytes =
     output instanceof Uint8Array ? output : new TextEncoder().encode(output);
   const normalized = new Uint8Array(bytes.byteLength);
   normalized.set(bytes);
+  reportProgress(1);
   return new Blob([normalized.buffer], { type: "video/mp4" });
 }

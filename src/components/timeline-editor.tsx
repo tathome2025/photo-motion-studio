@@ -122,6 +122,7 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isMergingDownload, setIsMergingDownload] = useState(false);
+  const [mergeProgress, setMergeProgress] = useState(0);
   const [isPending, startTransition] = useTransition();
   const copy =
     locale === "en"
@@ -152,6 +153,7 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           downloadAllClips: "Download merged timeline video",
           downloadStarted: "Download started.",
           downloadMergedWorking: "Merging timeline video...",
+          downloadMergedProgress: (value: number) => `Merging... ${value}%`,
           downloadMergedFailed: "Failed to merge timeline video.",
           noGeneratedClips: "No generated motion clips yet.",
           horizontalTimeline: "Horizontal timeline",
@@ -185,6 +187,7 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           downloadAllClips: "下載排序合成影片",
           downloadStarted: "已開始下載。",
           downloadMergedWorking: "正在合成排序影片...",
+          downloadMergedProgress: (value: number) => `合成中... ${value}%`,
           downloadMergedFailed: "合成排序影片失敗。",
           noGeneratedClips: "目前沒有已生成動態影像。",
           horizontalTimeline: "Horizontal timeline",
@@ -245,9 +248,15 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
     setError(null);
     setStatusMessage(copy.downloadMergedWorking);
     setIsMergingDownload(true);
+    setMergeProgress(0);
 
     try {
-      const mergedBlob = await mergeTimelineMotionClips({ assets: generatedMotionAssets });
+      const mergedBlob = await mergeTimelineMotionClips({
+        assets: generatedMotionAssets,
+        onProgress: (progress) => {
+          setMergeProgress(Math.round(progress * 100));
+        },
+      });
       const mergedUrl = URL.createObjectURL(mergedBlob);
       const projectSlug = projectId.slice(0, 8);
       triggerDownload(mergedUrl, `timeline-${projectSlug}.mp4`);
@@ -257,6 +266,7 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
       setError(reason instanceof Error ? reason.message : copy.downloadMergedFailed);
     } finally {
       setIsMergingDownload(false);
+      setMergeProgress(0);
     }
   }
 
@@ -477,20 +487,36 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
         {generatedMotionAssets.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">{copy.noGeneratedClips}</p>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {generatedMotionAssets.map((asset) => (
-              <article key={asset.id} className="grid gap-2 border border-[var(--line)] p-3">
-                <p className="truncate text-sm text-[var(--muted)]">{asset.fileName}</p>
-                <button
-                  type="button"
-                  className="h-10 border border-[var(--line)] px-4 text-xs uppercase tracking-[0.18em] transition hover:border-[var(--text)]"
-                  onClick={() => triggerDownload(asset.generatedUrl, buildDownloadFileName(asset))}
-                >
-                  {copy.downloadClip}
-                </button>
-              </article>
-            ))}
-          </div>
+          <>
+            {isMergingDownload ? (
+              <div className="grid gap-2 border border-[var(--line)] bg-[var(--surface-soft)] p-3">
+                <p className="text-sm text-[var(--muted)]">
+                  {copy.downloadMergedProgress(mergeProgress)}
+                </p>
+                <div className="h-2 w-full border border-[var(--line)]">
+                  <div
+                    className="h-full bg-[var(--text)] transition-[width] duration-300"
+                    style={{ width: `${mergeProgress}%` }}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {generatedMotionAssets.map((asset) => (
+                <article key={asset.id} className="grid gap-2 border border-[var(--line)] p-3">
+                  <p className="truncate text-sm text-[var(--muted)]">{asset.fileName}</p>
+                  <button
+                    type="button"
+                    className="h-10 border border-[var(--line)] px-4 text-xs uppercase tracking-[0.18em] transition hover:border-[var(--text)]"
+                    onClick={() => triggerDownload(asset.generatedUrl, buildDownloadFileName(asset))}
+                  >
+                    {copy.downloadClip}
+                  </button>
+                </article>
+              ))}
+            </div>
+          </>
         )}
       </section>
 
