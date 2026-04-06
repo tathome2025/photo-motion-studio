@@ -123,3 +123,59 @@ export async function renderVideoPreview(input: {
   normalized.set(bytes);
   return new Blob([normalized.buffer], { type: "video/mp4" });
 }
+
+export async function mergeTimelineMotionClips(input: {
+  assets: ProjectAsset[];
+}) {
+  const ffmpeg = await ensureFfmpegLoaded();
+  const playableAssets = input.assets.filter(
+    (asset) =>
+      asset.generationStatus === "completed" &&
+      !asset.isStaticClip &&
+      Boolean(asset.generatedUrl),
+  );
+
+  if (playableAssets.length === 0) {
+    throw new Error("沒有可合成的動態片段。");
+  }
+
+  const args: string[] = ["-y"];
+
+  for (let index = 0; index < playableAssets.length; index += 1) {
+    const asset = playableAssets[index];
+    await ffmpeg.writeFile(`merge-clip-${index}.mp4`, await fetchFile(asset.generatedUrl as string));
+    args.push("-i", `merge-clip-${index}.mp4`);
+  }
+
+  const preparedFilters = playableAssets.map(
+    (_asset, index) =>
+      `[${index}:v]fps=30,scale=${CONTENT_WIDTH}:${CONTENT_HEIGHT}:force_original_aspect_ratio=decrease,pad=${CONTENT_WIDTH}:${CONTENT_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1[v${index}]`,
+  );
+  const concatInputs = playableAssets.map((_asset, index) => `[v${index}]`).join("");
+  const filterComplex = [
+    ...preparedFilters,
+    `${concatInputs}concat=n=${playableAssets.length}:v=1:a=0[mergedv]`,
+  ].join(";");
+
+  await ffmpeg.exec([
+    ...args,
+    "-filter_complex",
+    filterComplex,
+    "-map",
+    "[mergedv]",
+    "-c:v",
+    "libx264",
+    "-pix_fmt",
+    "yuv420p",
+    "-movflags",
+    "+faststart",
+    "timeline-merged.mp4",
+  ]);
+
+  const output = await ffmpeg.readFile("timeline-merged.mp4");
+  const bytes =
+    output instanceof Uint8Array ? output : new TextEncoder().encode(output);
+  const normalized = new Uint8Array(bytes.byteLength);
+  normalized.set(bytes);
+  return new Blob([normalized.buffer], { type: "video/mp4" });
+}

@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { GripVertical, Trash2 } from "lucide-react";
 
 import { MAX_REGENERATION_COUNT } from "@/lib/constants";
+import { mergeTimelineMotionClips } from "@/lib/client-render";
 import { type Locale } from "@/lib/i18n";
 import type { ProjectAsset, TimelineUpdateItem } from "@/lib/types";
 
@@ -120,6 +121,7 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
   const [selectedAssetId, setSelectedAssetId] = useState(initialAssets[0]?.id ?? null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isMergingDownload, setIsMergingDownload] = useState(false);
   const [isPending, startTransition] = useTransition();
   const copy =
     locale === "en"
@@ -147,8 +149,10 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           deletePhoto: "Delete photo",
           downloadClip: "Download clip",
           downloadSectionTitle: "Generated motion clips",
-          downloadAllClips: "Download all clips",
+          downloadAllClips: "Download merged timeline video",
           downloadStarted: "Download started.",
+          downloadMergedWorking: "Merging timeline video...",
+          downloadMergedFailed: "Failed to merge timeline video.",
           noGeneratedClips: "No generated motion clips yet.",
           horizontalTimeline: "Horizontal timeline",
           reorder: "Drag thumbnails to reorder",
@@ -178,8 +182,10 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           deletePhoto: "刪除相片",
           downloadClip: "下載片段",
           downloadSectionTitle: "已生成動態影像",
-          downloadAllClips: "下載全部片段",
+          downloadAllClips: "下載排序合成影片",
           downloadStarted: "已開始下載。",
+          downloadMergedWorking: "正在合成排序影片...",
+          downloadMergedFailed: "合成排序影片失敗。",
           noGeneratedClips: "目前沒有已生成動態影像。",
           horizontalTimeline: "Horizontal timeline",
           reorder: "拖動縮圖重新排序",
@@ -231,22 +237,27 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
     setStatusMessage(copy.downloadStarted);
   }
 
-  function downloadAllGeneratedClips() {
+  async function downloadAllGeneratedClips() {
     if (generatedMotionAssets.length === 0) {
       return;
     }
 
-    generatedMotionAssets.forEach((asset, index) => {
-      if (!asset.generatedUrl) {
-        return;
-      }
+    setError(null);
+    setStatusMessage(copy.downloadMergedWorking);
+    setIsMergingDownload(true);
 
-      window.setTimeout(() => {
-        triggerDownload(asset.generatedUrl, buildDownloadFileName(asset));
-      }, index * 220);
-    });
-
-    setStatusMessage(copy.downloadStarted);
+    try {
+      const mergedBlob = await mergeTimelineMotionClips({ assets: generatedMotionAssets });
+      const mergedUrl = URL.createObjectURL(mergedBlob);
+      const projectSlug = projectId.slice(0, 8);
+      triggerDownload(mergedUrl, `timeline-${projectSlug}.mp4`);
+      window.setTimeout(() => URL.revokeObjectURL(mergedUrl), 5000);
+      setStatusMessage(copy.downloadStarted);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : copy.downloadMergedFailed);
+    } finally {
+      setIsMergingDownload(false);
+    }
   }
 
   function persistTimeline(nextAssets: ProjectAsset[], successMessage = copy.saved) {
@@ -457,9 +468,9 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
             type="button"
             className="h-11 border border-[var(--line)] px-4 text-sm uppercase tracking-[0.2em] transition hover:border-[var(--text)] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
             onClick={downloadAllGeneratedClips}
-            disabled={generatedMotionAssets.length === 0}
+            disabled={generatedMotionAssets.length === 0 || isMergingDownload}
           >
-            {copy.downloadAllClips}
+            {isMergingDownload ? copy.downloadMergedWorking : copy.downloadAllClips}
           </button>
         </div>
 
