@@ -11,6 +11,7 @@ const BACKGROUND_WIDTH = 1920;
 const BACKGROUND_HEIGHT = 1080;
 const CLIP_DURATION_SECONDS = 2.5;
 const FADE_SECONDS = 0.6;
+const MERGED_STILL_DURATION_SECONDS = 5;
 
 let ffmpegInstance: FFmpeg | null = null;
 
@@ -140,12 +141,11 @@ export async function mergeTimelineMotionClips(input: {
   const playableAssets = input.assets.filter(
     (asset) =>
       asset.generationStatus === "completed" &&
-      !asset.isStaticClip &&
-      Boolean(asset.generatedUrl),
+      (asset.isStaticClip || Boolean(asset.generatedUrl)),
   );
 
   if (playableAssets.length === 0) {
-    throw new Error("沒有可合成的動態片段。");
+    throw new Error("沒有可合成的片段。");
   }
 
   reportProgress(0.02);
@@ -153,14 +153,42 @@ export async function mergeTimelineMotionClips(input: {
 
   for (let index = 0; index < playableAssets.length; index += 1) {
     const asset = playableAssets[index];
-    await ffmpeg.writeFile(`merge-clip-${index}.mp4`, await fetchFile(asset.generatedUrl as string));
-    args.push("-i", `merge-clip-${index}.mp4`);
+
+    if (asset.isStaticClip) {
+      await ffmpeg.writeFile(
+        `merge-still-${index}.jpg`,
+        await fetchFile(asset.originalUrl),
+      );
+      args.push(
+        "-loop",
+        "1",
+        "-t",
+        String(MERGED_STILL_DURATION_SECONDS),
+        "-i",
+        `merge-still-${index}.jpg`,
+      );
+    } else {
+      if (!asset.generatedUrl) {
+        throw new Error(`片段 ${asset.fileName} 未完成，請返回上一頁檢查。`);
+      }
+
+      await ffmpeg.writeFile(
+        `merge-clip-${index}.mp4`,
+        await fetchFile(asset.generatedUrl),
+      );
+      args.push("-i", `merge-clip-${index}.mp4`);
+    }
+
     reportProgress(((index + 1) / playableAssets.length) * 0.35);
   }
 
   const preparedFilters = playableAssets.map(
-    (_asset, index) =>
-      `[${index}:v]fps=30,scale=${CONTENT_WIDTH}:${CONTENT_HEIGHT}:force_original_aspect_ratio=decrease,pad=${CONTENT_WIDTH}:${CONTENT_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1[v${index}]`,
+    (asset, index) =>
+      `[${index}:v]fps=30,scale=${CONTENT_WIDTH}:${CONTENT_HEIGHT}:force_original_aspect_ratio=decrease,pad=${CONTENT_WIDTH}:${CONTENT_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1${
+        asset.isStaticClip
+          ? `,trim=duration=${MERGED_STILL_DURATION_SECONDS},setpts=PTS-STARTPTS`
+          : ""
+      }[v${index}]`,
   );
   const concatInputs = playableAssets.map((_asset, index) => `[v${index}]`).join("");
   const filterComplex = [

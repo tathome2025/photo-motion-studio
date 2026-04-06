@@ -32,7 +32,9 @@ interface TimelineEditorProps {
   locale: Locale;
 }
 
-type GeneratedMotionAsset = ProjectAsset & { generatedUrl: string; isStaticClip: false };
+type MergeableTimelineAsset =
+  | (ProjectAsset & { isStaticClip: true })
+  | (ProjectAsset & { generatedUrl: string; isStaticClip: false });
 
 function SortableTimelineClip({
   asset,
@@ -152,7 +154,7 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           openRegenerate: "Open regenerate page",
           deletePhoto: "Delete photo",
           downloadClip: "Download clip",
-          downloadSectionTitle: "Generated motion clips",
+          downloadSectionTitle: "Timeline clip downloads",
           downloadAllClips: "Download merged timeline video",
           downloadStarted: "Download started.",
           downloadMergedWorking: "Merging timeline video...",
@@ -160,7 +162,8 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           downloadMergedReady: "Merged video is ready.",
           downloadMergedNow: "Download merged video now",
           downloadMergedFailed: "Failed to merge timeline video.",
-          noGeneratedClips: "No generated motion clips yet.",
+          noGeneratedClips: "No completed timeline clips yet.",
+          stillMergedHint: "Included as a 5s still in merged video",
           horizontalTimeline: "Horizontal timeline",
           reorder: "Drag thumbnails to reorder",
           clips: (count: number) => `${count} clips`,
@@ -188,7 +191,7 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           openRegenerate: "打開重新生成頁面",
           deletePhoto: "刪除相片",
           downloadClip: "下載片段",
-          downloadSectionTitle: "已生成動態影像",
+          downloadSectionTitle: "時間線片段下載",
           downloadAllClips: "下載排序合成影片",
           downloadStarted: "已開始下載。",
           downloadMergedWorking: "正在合成排序影片...",
@@ -196,7 +199,8 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
           downloadMergedReady: "合成影片已完成。",
           downloadMergedNow: "立即下載合成影片",
           downloadMergedFailed: "合成排序影片失敗。",
-          noGeneratedClips: "目前沒有已生成動態影像。",
+          noGeneratedClips: "目前沒有可合成的已完成片段。",
+          stillMergedHint: "會以 5 秒靜態片段加入合成影片",
           horizontalTimeline: "Horizontal timeline",
           reorder: "拖動縮圖重新排序",
           clips: (count: number) => `${count} clips`,
@@ -216,11 +220,12 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
   const selectedAsset =
     assets.find((asset) => asset.id === selectedAssetId) ?? assets[0] ?? null;
   const orderedIds = useMemo(() => assets.map((asset) => asset.id), [assets]);
-  const generatedMotionAssets = useMemo(
+  const mergeableTimelineAssets = useMemo(
     () =>
       assets.filter(
-        (asset): asset is GeneratedMotionAsset =>
-          asset.generationStatus === "completed" && !asset.isStaticClip && Boolean(asset.generatedUrl),
+        (asset): asset is MergeableTimelineAsset =>
+          asset.generationStatus === "completed" &&
+          (asset.isStaticClip || Boolean(asset.generatedUrl)),
       ),
     [assets],
   );
@@ -256,7 +261,7 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
   }
 
   async function downloadAllGeneratedClips() {
-    if (generatedMotionAssets.length === 0) {
+    if (mergeableTimelineAssets.length === 0) {
       return;
     }
 
@@ -281,7 +286,7 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
 
     try {
       const mergedBlob = await mergeTimelineMotionClips({
-        assets: generatedMotionAssets,
+        assets: mergeableTimelineAssets,
         onProgress: (progress) => {
           setMergeProgress(Math.round(progress * 100));
         },
@@ -516,13 +521,13 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
             type="button"
             className="h-11 border border-[var(--line)] px-4 text-sm uppercase tracking-[0.2em] transition hover:border-[var(--text)] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
             onClick={downloadAllGeneratedClips}
-            disabled={generatedMotionAssets.length === 0 || isMergingDownload}
+            disabled={mergeableTimelineAssets.length === 0 || isMergingDownload}
           >
             {isMergingDownload ? copy.downloadMergedWorking : copy.downloadAllClips}
           </button>
         </div>
 
-        {generatedMotionAssets.length === 0 ? (
+        {mergeableTimelineAssets.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">{copy.noGeneratedClips}</p>
         ) : (
           <>
@@ -558,16 +563,22 @@ export function TimelineEditor({ projectId, initialAssets, locale }: TimelineEdi
             ) : null}
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {generatedMotionAssets.map((asset) => (
+              {mergeableTimelineAssets.map((asset) => (
                 <article key={asset.id} className="grid gap-2 border border-[var(--line)] p-3">
                   <p className="truncate text-sm text-[var(--muted)]">{asset.fileName}</p>
-                  <button
-                    type="button"
-                    className="h-10 border border-[var(--line)] px-4 text-xs uppercase tracking-[0.18em] transition hover:border-[var(--text)]"
-                    onClick={() => triggerDownload(asset.generatedUrl, buildDownloadFileName(asset))}
-                  >
-                    {copy.downloadClip}
-                  </button>
+                  {asset.isStaticClip ? (
+                    <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+                      {copy.stillMergedHint}
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      className="h-10 border border-[var(--line)] px-4 text-xs uppercase tracking-[0.18em] transition hover:border-[var(--text)]"
+                      onClick={() => triggerDownload(asset.generatedUrl, buildDownloadFileName(asset))}
+                    >
+                      {copy.downloadClip}
+                    </button>
+                  )}
                 </article>
               ))}
             </div>
